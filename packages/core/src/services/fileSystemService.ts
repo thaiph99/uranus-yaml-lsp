@@ -1,13 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-/**
- * Service for file system operations, specifically for finding and reading YAML files.
- * Optimized with parallel directory traversal and file operations.
- */
 export class FileSystemService {
   private readonly yamlExtensions = ['.yaml', '.yml'];
-  private readonly maxConcurrency = 20; // Limit concurrent directory operations
+  private readonly maxConcurrency = 20;
   private readonly ignoredDirs = new Set([
     'node_modules', '.git', '.vscode', 'dist', 'build', 'out', 'target'
   ]);
@@ -27,7 +23,6 @@ export class FileSystemService {
     fileList: Set<string>,
     depth: number = 0
   ): Promise<void> {
-    // Limit recursion depth to prevent infinite loops and improve performance
     if (depth > 10) return;
 
     try {
@@ -45,7 +40,6 @@ export class FileSystemService {
         }
       }
 
-      // Process directories in parallel with concurrency limit
       await this.processInBatches(dirPromises, this.maxConcurrency);
 
     } catch {

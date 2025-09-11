@@ -1,0 +1,49 @@
+export class WorkspaceCacheService {
+  private cache = new Map<string, { content: string; timestamp: number }>();
+  private readonly cacheTimeout = 30000; // 30 seconds
+
+  public get(key: string): string | undefined {
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+
+    if (Date.now() - entry.timestamp > this.cacheTimeout) {
+      this.cache.delete(key);
+      return undefined;
+    }
+
+    return entry.content;
+  }
+
+  public set(key: string, content: string): void {
+    this.cache.set(key, {
+      content,
+      timestamp: Date.now()
+    });
+
+    // Clean up old entries periodically
+    if (this.cache.size > 100) {
+      this.cleanup();
+    }
+  }
+
+  public clear(): void {
+    this.cache.clear();
+  }
+
+  public dispose(): void {
+    this.clear();
+  }
+
+  private cleanup(): void {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+
+    for (const [key, value] of this.cache.entries()) {
+      if (now - value.timestamp > this.cacheTimeout) {
+        keysToDelete.push(key);
+      }
+    }
+
+    keysToDelete.forEach(key => this.cache.delete(key));
+  }
+}

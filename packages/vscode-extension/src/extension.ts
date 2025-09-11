@@ -1,8 +1,6 @@
 import * as vscode from "vscode";
 import { ArgoTemplateDefinitionProvider } from "./providers/argoTemplateDefinitionProvider";
-import { TemplateSearchService } from "./services/templateSearchService";
-import { FileSystemService } from "./services/fileSystemService";
-import { WorkspaceCacheService } from "./services/workspaceCacheService";
+import { TemplateSearchService, FileSystemService, WorkspaceCacheService } from "@uranus-yaml/core";
 
 export async function activate(
   context: vscode.ExtensionContext

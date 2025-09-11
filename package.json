@@ -1,66 +1,23 @@
 {
-  "name": "uranus-yaml",
-  "displayName": "Uranus YAML - Argo Workflow Navigator",
-  "description": "Intelligent Ctrl+Click navigation for Argo WorkflowTemplate references in YAML files. Navigate seamlessly between template definitions and usages.",
+  "name": "uranus-yaml-monorepo",
   "version": "0.0.1",
-  "publisher": "ThaiPham",
-  "author": {
-    "name": "Thai Pham"
-  },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/thaiph99/uranus-yaml-vscode.git"
-  },
-  "bugs": {
-    "url": "https://github.com/thaiph99/uranus-yaml-vscode/issues"
-  },
-  "homepage": "https://github.com/thaiph99/uranus-yaml-vscode#readme",
-  "keywords": [
-    "yaml",
-    "argo",
-    "workflow",
-    "template",
-    "navigation",
-    "go-to-definition",
-    "kubernetes",
-    "devops"
+  "description": "Argo YAML template navigation for VSCode and Neovim",
+  "private": true,
+  "workspaces": [
+    "packages/*"
   ],
-  "engines": {
-    "vscode": "^1.80.0"
-  },
-  "categories": [
-    "Programming Languages",
-    "Other"
-  ],
-  "activationEvents": [
-    "onLanguage:yaml"
-  ],
-  "main": "./out/extension.js",
-  "contributes": {
-    "languages": [
-      {
-        "id": "yaml",
-        "aliases": [
-          "YAML"
-        ],
-        "extensions": [
-          ".yaml",
-          ".yml"
-        ]
-      }
-    ]
-  },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "lint": "tsc --noEmit"
+    "build": "npm run build --workspaces",
+    "clean": "npm run clean --workspaces",
+    "watch": "npm run watch --workspaces",
+    "build:core": "npm run build -w packages/core",
+    "build:lsp": "npm run build -w packages/lsp-server",
+    "build:vscode": "npm run build -w packages/vscode-extension",
+    "install:all": "npm install && npm install --workspaces",
+    "package:vscode": "cd packages/vscode-extension && vsce package",
+    "package:lsp": "cd packages/lsp-server && npm pack"
   },
   "devDependencies": {
-    "@types/vscode": "^1.80.0",
-    "@types/node": "^18.0.0",
-    "typescript": "^5.0.0"
-  },
-  "dependencies": {}
+    "rimraf": "^5.0.0"
+  }
 }

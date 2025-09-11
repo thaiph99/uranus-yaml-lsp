@@ -1,0 +1,21 @@
+{
+  "name": "@uranus-yaml/core",
+  "version": "0.0.1",
+  "description": "Core functionality for Argo YAML template navigation",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "rimraf": "^5.0.0",
+    "@types/node": "^18.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

@@ -1,5 +1,9 @@
+# Monorepo structure - exclude everything except vscode-extension package
+packages/core/**
+packages/lsp-server/**
+packages/shared-config/**
+
 # Source TypeScript files
-src/**
 tsconfig.json
 
 # Development dependencies
@@ -11,11 +15,12 @@ node_modules/**
 *.vsix
 .editorconfig
 .vscode/**
+Makefile
 
 # Test files
 test/**
 coverage/**
-test-files/**
+packages/core/test-files/**
 
 # Documentation
 docs/**

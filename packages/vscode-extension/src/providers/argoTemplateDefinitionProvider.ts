@@ -1,14 +1,7 @@
 import * as vscode from "vscode";
-import { TemplateSearchService } from "../services/templateSearchService";
-import { TemplateRefContext } from "../types";
+import { TemplateSearchService, TemplateRefContext } from "@uranus-yaml/core";
 
-/**
- * Definition provider for Argo WorkflowTemplate references in YAML files.
- * Enables Ctrl+Click navigation to template definitions and find references.
- */
-export class ArgoTemplateDefinitionProvider
-  implements vscode.DefinitionProvider
-{
+export class ArgoTemplateDefinitionProvider implements vscode.DefinitionProvider {
   constructor(private readonly templateSearchService: TemplateSearchService) {}
 
   public async provideDefinition(
@@ -16,7 +9,6 @@ export class ArgoTemplateDefinitionProvider
     position: vscode.Position,
     token: vscode.CancellationToken
   ): Promise<vscode.Location | vscode.Location[] | undefined> {
-    // Early exit checks
     if (token.isCancellationRequested) {
       return undefined;
     }
@@ -34,7 +26,6 @@ export class ArgoTemplateDefinitionProvider
     // Check if we're clicking on a template definition (in a WorkflowTemplate)
     const templateDefinitionContext = this.extractTemplateDefinitionContext(document, position);
     if (templateDefinitionContext) {
-      // Show references instead of definition
       return this.findTemplateReferences(
         workspaceFolder.uri.fsPath,
         templateDefinitionContext,
@@ -45,7 +36,6 @@ export class ArgoTemplateDefinitionProvider
     // Check if we're clicking on a WorkflowTemplate name definition
     const workflowTemplateDefinitionContext = this.extractWorkflowTemplateDefinitionContext(document, position);
     if (workflowTemplateDefinitionContext) {
-      // Show all references to this WorkflowTemplate
       return this.findWorkflowTemplateReferences(
         workspaceFolder.uri.fsPath,
         workflowTemplateDefinitionContext,
@@ -57,7 +47,6 @@ export class ArgoTemplateDefinitionProvider
     const templateRefContext = this.extractTemplateRefContext(document, position);
 
     if (templateRefContext) {
-      // Search for specific template within WorkflowTemplate
       return this.findTemplateInWorkflowTemplate(
         workspaceFolder.uri.fsPath,
         templateRefContext,
@@ -89,7 +78,6 @@ export class ArgoTemplateDefinitionProvider
   }
 
   private isNameReference(line: string): boolean {
-    // Look for template references or name declarations
     return (
       line.includes("name:") ||
       line.includes("template:")
@@ -102,18 +90,15 @@ export class ArgoTemplateDefinitionProvider
   ): TemplateRefContext | undefined {
     const currentLine = document.lineAt(position).text;
 
-    // Check if we're on a "template:" line within a templateRef block
     if (!currentLine.includes("template:")) {
       return undefined;
     }
 
-    // Extract the template name from current line
     const templateName = this.extractTemplateName(document, position);
     if (!templateName) {
       return undefined;
     }
 
-    // Look backwards to find the templateRef block and extract the WorkflowTemplate name
     const workflowTemplateName = this.findWorkflowTemplateNameInTemplateRef(document, position);
     if (!workflowTemplateName) {
       return undefined;
@@ -129,13 +114,10 @@ export class ArgoTemplateDefinitionProvider
     document: vscode.TextDocument,
     position: vscode.Position
   ): string | undefined {
-    // Look backwards from current position to find the templateRef block
     for (let i = position.line; i >= Math.max(0, position.line - 15); i--) {
       const line = document.lineAt(i).text;
 
-      // Check if this is the templateRef block start
       if (line.includes("templateRef:")) {
-        // Look forward from templateRef to find the name (should be the next few lines)
         for (let j = i + 1; j <= Math.min(document.lineCount - 1, position.line + 3); j++) {
           const nameCandidate = document.lineAt(j).text;
           if (nameCandidate.includes("name:") && !nameCandidate.includes("template:")) {
@@ -210,7 +192,6 @@ export class ArgoTemplateDefinitionProvider
       }
 
       if (searchResult.locations.length === 0) {
-        // Don't show warning for common cases to avoid spam
         if (templateName !== "main" && templateName !== "default") {
           void vscode.window.showWarningMessage(
             `WorkflowTemplate '${templateName}' not found.`
@@ -219,7 +200,6 @@ export class ArgoTemplateDefinitionProvider
         return undefined;
       }
 
-      // Only show success message if more than one result to avoid spam
       if (searchResult.locations.length > 1) {
         void vscode.window.showInformationMessage(
           `Found ${searchResult.locations.length} WorkflowTemplate definitions for '${templateName}'`
@@ -245,7 +225,6 @@ export class ArgoTemplateDefinitionProvider
   ): string | undefined {
     const line = document.lineAt(position).text;
 
-    // First try to get the word at the cursor position
     const wordRange = document.getWordRangeAtPosition(
       position,
       /[\w-]+/
@@ -253,13 +232,11 @@ export class ArgoTemplateDefinitionProvider
 
     if (wordRange) {
       const word = document.getText(wordRange);
-      // Make sure we got a meaningful word (not just punctuation)
       if (word && word.length > 0 && /[\w-]/.test(word)) {
         return word;
       }
     }
 
-    // Fallback: extract from the line using regex
     if (line.includes("name:")) {
       const nameMatch = line.match(/name:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
       if (nameMatch) {
@@ -283,18 +260,15 @@ export class ArgoTemplateDefinitionProvider
   ): string | undefined {
     const currentLine = document.lineAt(position).text;
 
-    // Check if we're on a "name:" line within a templateRef block
     if (!currentLine.includes("name:") || currentLine.includes("template:")) {
       return undefined;
     }
 
-    // Check if we're within a templateRef block
     const isInTemplateRef = this.isInTemplateRefBlock(document, position);
     if (!isInTemplateRef) {
       return undefined;
     }
 
-    // Extract the WorkflowTemplate name from current line
     return this.extractTemplateName(document, position);
   }
 
@@ -302,13 +276,11 @@ export class ArgoTemplateDefinitionProvider
     document: vscode.TextDocument,
     position: vscode.Position
   ): boolean {
-    // Look backwards to see if we're within a templateRef block
     for (let i = position.line; i >= Math.max(0, position.line - 5); i--) {
       const line = document.lineAt(i).text;
       if (line.includes("templateRef:")) {
         return true;
       }
-      // If we hit another block or step, we're not in a templateRef
       if (line.includes("- name:") && i < position.line) {
         return false;
       }
@@ -327,29 +299,24 @@ export class ArgoTemplateDefinitionProvider
   ): { workflowTemplateName: string; templateName: string } | undefined {
     const currentLine = document.lineAt(position).text;
 
-    // Check if we're on a line that contains a template name in a WorkflowTemplate definition
     if (!currentLine.includes("name:")) {
       return undefined;
     }
 
-    // Check if this is a template definition (- name: templateName in templates section)
     const templateNameMatch = currentLine.match(/^\s*-\s+name:\s*(.+)$/);
     if (!templateNameMatch) {
       return undefined;
     }
 
-    // Check if we're within a templates section of a WorkflowTemplate
     if (!this.isWithinTemplatesSection(document, position)) {
       return undefined;
     }
 
-    // Extract the template name
     const templateName = this.extractTemplateName(document, position);
     if (!templateName) {
       return undefined;
     }
 
-    // Find the WorkflowTemplate this template belongs to
     const workflowTemplateName = this.findContainingWorkflowTemplate(document, position);
     if (!workflowTemplateName) {
       return undefined;
@@ -365,13 +332,11 @@ export class ArgoTemplateDefinitionProvider
     document: vscode.TextDocument,
     position: vscode.Position
   ): boolean {
-    // Look backwards to find "templates:" section
     for (let i = position.line; i >= Math.max(0, position.line - 50); i--) {
       const line = document.lineAt(i).text;
       if (line.includes("templates:")) {
         return true;
       }
-      // If we hit another major section, we're not in templates
       if (line.includes("kind:") || line.includes("apiVersion:")) {
         return false;
       }
@@ -383,13 +348,10 @@ export class ArgoTemplateDefinitionProvider
     document: vscode.TextDocument,
     position: vscode.Position
   ): string | undefined {
-    // Look backwards from current position to find the WorkflowTemplate metadata
     for (let i = position.line; i >= 0; i--) {
       const line = document.lineAt(i).text;
 
-      // Found the WorkflowTemplate kind
       if (line.includes("kind: WorkflowTemplate")) {
-        // Look forward to find the name in metadata section
         for (let j = i; j < Math.min(document.lineCount, i + 20); j++) {
           const metadataLine = document.lineAt(j).text;
           if (metadataLine.includes("name:") &&
@@ -457,17 +419,14 @@ export class ArgoTemplateDefinitionProvider
   ): string | undefined {
     const currentLine = document.lineAt(position).text;
 
-    // Check if we're on a line that contains a name in metadata section
     if (!currentLine.includes("name:")) {
       return undefined;
     }
 
-    // Check if we're in a WorkflowTemplate metadata section
     if (!this.isInWorkflowTemplateMetadata(document, position)) {
       return undefined;
     }
 
-    // Extract the WorkflowTemplate name
     const nameMatch = currentLine.match(/name:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
     if (nameMatch) {
       return nameMatch[1];
@@ -480,7 +439,6 @@ export class ArgoTemplateDefinitionProvider
     document: vscode.TextDocument,
     position: vscode.Position
   ): boolean {
-    // Look backwards to check if we're in a WorkflowTemplate metadata section
     let foundWorkflowTemplate = false;
     let foundMetadata = false;
 
@@ -496,7 +454,6 @@ export class ArgoTemplateDefinitionProvider
         break;
       }
 
-      // If we hit spec: or another major section before metadata, we're not in the right place
       if (line.includes("spec:") || line.includes("status:")) {
         return false;
       }

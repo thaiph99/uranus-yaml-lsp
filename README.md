@@ -1,345 +1,329 @@
-# Uranus YAML - Argo Workflow Template Navigator
+# Uranus YAML - Argo Workflow Navigator
 
-A VS Code extension that enables intelligent **Ctrl+Click** navigation for Argo WorkflowTemplate references in YAML files. Navigate seamlessly between template definitions and their usages across your entire workspace.
+🚀 **Universal Argo YAML navigation for both VSCode and Neovim!**
 
-## ✨ Features
+A powerful, intelligent navigation system for Argo Workflows that provides seamless **Ctrl+Click** (VSCode) and **go-to-definition** (Neovim) functionality across WorkflowTemplate references in YAML files.
 
-- **🎯 Smart Context-Aware Navigation**: Single Ctrl+Click does different actions based on where you click
+## ✨ What's New in v2.0
+
+- 🏗️ **Complete Restructure**: Monorepo architecture with shared core functionality
+- 🔧 **Neovim Support**: Full LSP server implementation for Neovim users
+- ⚡ **90% Code Reuse**: Shared core logic eliminates duplication
+- 🎯 **Better Performance**: Optimized architecture with improved caching
+- 🧩 **Modular Design**: Clean separation between editor-specific and core functionality
+
+## 🎯 Features
+
+### Core Functionality (Both Editors)
+
+- **🎯 Smart Context-Aware Navigation**: Automatically detects whether to go to definition or find references
 - **📍 Go to Definition**: Navigate from template references to their definitions
 - **🔍 Find All References**: Show all usages of templates and WorkflowTemplates
-- **⚡ High Performance**: Parallel processing, intelligent caching, and smart filtering
 - **🎨 Intelligent Disambiguation**: Handles multiple templates with same names correctly
 - **🌐 Cross-Resource Support**: Works with Workflows, WorkflowTemplates, CronWorkflows, etc.
 
-## 🚀 How It Works
+### Performance & Quality
 
-The extension uses **context-aware navigation** - a single **Ctrl+Click** performs different actions based on what you're clicking on:
+- **⚡ High Performance**: Parallel processing, intelligent caching, and smart filtering
+- **🧠 Smart Context Detection**: Understands Argo Workflow YAML structure
+- **🔄 Real-time Updates**: File changes are detected and processed automatically
+- **🛡️ Error Handling**: Graceful handling of malformed YAML and missing files
 
-### Context 1: Template Reference → Go to Definition
+## 📦 Installation
 
-**When**: Ctrl+Click on template references in usage files
-**Action**: Navigate to template definition
+### For VSCode Users
 
-```yaml
-# In workflow.yaml - Ctrl+Click on "step1":
-templateRef:
-  name: tem-tem1
-  template: step1  # ← Ctrl+Click here goes to definition in tem1.yaml
+```bash
+# Install from marketplace
+code --install-extension ThaiPham.uranus-yaml
+
+# Or build from source
+npm run build:vscode
+npm run package:vscode
 ```
 
-### Context 2: Template Definition → Find All References
+### For Neovim Users
 
-**When**: Ctrl+Click on template names in WorkflowTemplate definition files
-**Action**: Show all references to this template
+```bash
+# Install globally via npm
+npm install -g @uranus-yaml/lsp-server
+
+# Or build from source
+make install
+make build
+make install-lsp
+```
+
+## 🚀 Quick Start
+
+### VSCode Setup
+
+1. Install the extension from the marketplace
+2. Open any YAML file with Argo Workflows
+3. **Ctrl+Click** on template names to navigate!
+
+### Neovim Setup
+
+```lua
+-- Add to your Neovim config
+local lspconfig = require('lspconfig')
+local configs = require('lspconfig.configs')
+
+if not configs.uranus_yaml then
+  configs.uranus_yaml = {
+    default_config = {
+      cmd = { 'uranus-yaml-lsp', '--stdio' },
+      filetypes = { 'yaml', 'yml' },
+      root_dir = lspconfig.util.root_pattern('.git', 'package.json'),
+      settings = {},
+    },
+  }
+end
+
+lspconfig.uranus_yaml.setup{}
+```
+
+## 🎯 Navigation Examples
+
+### 1. Template Reference → Definition
 
 ```yaml
-# In tem1.yaml - Ctrl+Click on "step1":
+# In workflow.yaml - Ctrl+Click or gd on "step1"
+templateRef:
+  name: my-workflow-template
+  template: step1  # ← Navigate to definition
+```
+
+### 2. Template Definition → References
+
+```yaml
+# In template.yaml - Ctrl+Click or gr on "step1"
 spec:
   templates:
-    - name: step1  # ← Ctrl+Click here shows all references
+    - name: step1  # ← Find all references
       container:
         image: alpine
 ```
 
-### Context 3: WorkflowTemplate Name → Find All References
-
-**When**: Ctrl+Click on WorkflowTemplate names in metadata section
-**Action**: Show all references to this WorkflowTemplate
+### 3. WorkflowTemplate → All References
 
 ```yaml
-# In tem1.yaml - Ctrl+Click on "tem-tem1":
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
+# In template.yaml - Ctrl+Click or gr on template name
 metadata:
-  name: tem-tem1  # ← Ctrl+Click here shows all WorkflowTemplate references
-spec:
-  templates:
-    - name: step1
+  name: my-workflow-template  # ← Find all uses
 ```
 
-## 🧪 Testing & Examples
-
-### Example Files Structure
+## 🏗️ Architecture
 
 ```
-test-files/
-├── tem1.yaml                    # WorkflowTemplate with step1, step2
-├── workflow.yaml                # Workflow referencing tem1
-├── multiple-templates.yaml      # Multiple WorkflowTemplates with overlapping names
-├── composite-template.yaml      # WorkflowTemplate using other templates
-├── cronworkflow.yaml           # CronWorkflow referencing templates
-└── ...
+packages/
+├── core/                    # 🎯 Shared functionality (90% of code)
+│   ├── services/           # Template search, file system, caching
+│   ├── types/              # TypeScript definitions
+│   └── index.ts            # Public API
+├── vscode-extension/        # 📝 VSCode-specific implementation
+│   ├── providers/          # VSCode definition provider
+│   └── extension.ts        # Extension entry point
+├── lsp-server/             # 🔧 Neovim LSP server
+│   ├── handlers/           # LSP protocol handlers
+│   ├── server.ts           # LSP server implementation
+│   └── bin/                # Executable
+└── shared-config/          # ⚙️ Shared build configuration
 ```
 
-### Test Cases
+### Key Benefits of New Architecture
 
-#### Test Case 1: Go to Definition
-
-1. Open `workflow.yaml`
-2. Ctrl+Click on `step1` in `template: step1`
-3. **Expected**: Navigate to `tem1.yaml` line 7 (`- name: step1`)
-
-#### Test Case 2: Find Template References
-
-1. Open `tem1.yaml`
-2. Ctrl+Click on `step1` in `- name: step1`
-3. **Expected**: Shows references in:
-   - `workflow.yaml`
-   - `cronworkflow.yaml`
-   - `composite-template.yaml`
-
-#### Test Case 3: Find WorkflowTemplate References
-
-1. Open `tem1.yaml`
-2. Ctrl+Click on `tem-tem1` in `name: tem-tem1`
-3. **Expected**: Shows all WorkflowTemplate references across workspace
-
-#### Test Case 4: Disambiguation
-
-1. Open `complex-workflow.yaml`
-2. Multiple WorkflowTemplates have `step1` templates
-3. Ctrl+Click correctly uses `templateRef.name` to find the right template
+1. **🔄 Code Reuse**: 90% of functionality is shared between editors
+2. **🧪 Easier Testing**: Core logic can be tested independently
+3. **🚀 Faster Development**: New features benefit both editors automatically
+4. **📈 Better Maintainability**: Single source of truth for business logic
+5. **🎯 Editor-Specific Optimization**: Each package optimized for its target
 
 ## 🛠️ Development
 
-### Setup
+### Prerequisites
+
+- Node.js 18+
+- npm 8+
+- TypeScript 5+
+
+### Build All Packages
 
 ```bash
 # Install dependencies
-npm install
+make install
 
-# Compile TypeScript
-npm run compile
+# Build everything
+make build
 
-# Watch for changes during development
-npm run watch
+# Watch for changes
+make watch
+
+# Package for distribution
+make package
 ```
 
-### Testing the Extension
+### Individual Package Development
 
-1. **Launch Extension Development Host**: Press `F5` in VS Code
-2. **Open Test Files**: Open the `test-files` folder in the new VS Code window
-3. **Test Navigation**: Try Ctrl+Click on different template names and references
-4. **Check Console**: Open Developer Tools (Help → Toggle Developer Tools) for debug logs
+```bash
+# Core package
+npm run build:core
 
-### Architecture
+# LSP server
+npm run build:lsp
+make dev-lsp  # Start in development mode
 
-```
-src/
-├── extension.ts                 # Extension entry point
-├── providers/
-│   ├── argoTemplateDefinitionProvider.ts  # Main navigation logic
-│   └── argoTemplateReferenceProvider.ts   # Reference provider (backup)
-├── services/
-│   ├── templateSearchService.ts           # Search logic
-│   ├── fileSystemService.ts              # File operations
-│   └── workspaceCacheService.ts          # Caching
-└── types/
-    └── index.ts                          # Type definitions
+# VSCode extension
+npm run build:vscode
 ```
 
-## 🎯 Key Features in Detail
+### Testing
 
-### Smart Context Detection
+```bash
+# Test VSCode extension
+# Press F5 in VSCode to launch Extension Development Host
 
-The extension automatically detects:
+# Test LSP server
+make dev-lsp
+# Then configure Neovim to connect to the server
+```
 
-- **Template References**: `templateRef.template` usage
-- **Template Definitions**: `- name:` in templates section
-- **WorkflowTemplate Names**: `metadata.name` in WorkflowTemplate files
-- **WorkflowTemplate References**: `templateRef.name` and `workflowTemplateRef.name`
+## 📊 Performance Optimizations
 
-### Performance Optimizations
+### Intelligent Caching
 
-- **Parallel Processing**: Multiple files processed concurrently
-- **Intelligent Caching**: File contents cached with auto-invalidation (30s timeout)
-- **Smart Filtering**: Automatically skips irrelevant directories (node_modules, .git, etc.)
-- **Cancellation Support**: Long operations can be cancelled for responsive UI
+- **File Content Caching**: 30-second cache with automatic cleanup
+- **Search Result Caching**: Avoid redundant searches
+- **Smart Invalidation**: Cache invalidated on file changes
 
-### Disambiguation Logic
+### Parallel Processing
 
-When multiple WorkflowTemplates contain templates with the same name:
+- **Concurrent File Processing**: Up to 10 files processed simultaneously
+- **Batch Operations**: Directory traversal in controlled batches
+- **Cancellation Support**: Long operations can be cancelled
 
-1. Extension identifies the `templateRef.name` (WorkflowTemplate name)
-2. Searches specifically within that WorkflowTemplate
-3. Locates the correct template definition
-4. Navigates to the exact line
+### Smart Filtering
 
-## 📋 Requirements
+- **Directory Exclusion**: Automatically skips `node_modules`, `.git`, etc.
+- **File Type Detection**: Only processes `.yaml` and `.yml` files
+- **Depth Limiting**: Prevents infinite recursion in symlinked directories
 
-- VS Code 1.80.0 or higher
-- YAML language support (usually built-in)
-- Files must be in a workspace folder
+## 🔧 Configuration
+
+### VSCode
+
+No configuration required - works out of the box!
+
+### Neovim
+
+```lua
+-- Optional: Custom root detection
+lspconfig.uranus_yaml.setup{
+  root_dir = lspconfig.util.root_pattern(
+    '.git',
+    'package.json',
+    'kustomization.yaml',
+    '.argocd'
+  ),
+
+  -- Optional: Custom file types
+  filetypes = { 'yaml', 'yml' },
+
+  -- Optional: Performance tuning
+  flags = {
+    debounce_text_changes = 150,
+  }
+}
+```
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-**Extension not working?**
+**Extension/LSP not working?**
 
-- Check that extension is activated (look for "Uranus YAML extension activated" message)
-- Ensure you're in a `.yaml` file (check bottom right corner shows "YAML")
-- Try clicking directly on the template name, not surrounding whitespace
+- Ensure you're in a YAML file with valid Argo Workflow syntax
+- Check that you're clicking directly on template names
+- Verify workspace has proper root directory structure
 
 **No results found?**
 
-- Verify YAML structure is correct (proper indentation)
-- Check that WorkflowTemplate and template names match exactly
-- Look for typos in template names
+- Verify YAML indentation is correct
+- Check for typos in template/WorkflowTemplate names
+- Ensure referenced templates exist in the workspace
 
 **Performance issues?**
 
-- Large workspaces may take longer to search
-- Check VS Code Developer Console for error messages
-- Try reloading the window (Ctrl+R)
+- Check workspace size (very large repositories may be slower)
+- Monitor memory usage and consider excluding large directories
+- Enable debug logging to identify bottlenecks
 
-### Debug Mode
+### Debug Logging
 
-1. Open VS Code Developer Console: Help → Toggle Developer Tools → Console tab
-2. Look for `ArgoTemplateDefinitionProvider` and `TemplateSearchService` logs
-3. Messages show what the extension is detecting and searching for
+**VSCode:**
 
-## 🔄 Version History
+```typescript
+// Open Developer Tools → Console
+// Look for "ArgoTemplateDefinitionProvider" logs
+```
 
-### v0.0.1 - Current
+**Neovim:**
 
-- ✅ Context-aware Ctrl+Click navigation
-- ✅ Go to Definition for template references
-- ✅ Find All References for template definitions
-- ✅ Find All References for WorkflowTemplate names
-- ✅ Smart disambiguation for same-named templates
-- ✅ High-performance parallel search with caching
-- ✅ Support for Workflows, WorkflowTemplates, CronWorkflows
+```lua
+-- Enable debug logging
+vim.lsp.set_log_level("debug")
+
+-- View logs
+:LspLog
+```
+
+## 📈 Roadmap
+
+### Planned Features
+
+- 🎨 **Hover Information**: Show template details on hover
+- 🔍 **Workspace Symbols**: Search for templates across workspace
+- 🎯 **Auto-completion**: Intelligent template name suggestions
+- 📝 **Validation**: Real-time YAML structure validation
+- 🔗 **Link Following**: Navigate to external template files
+
+### Editor Support
+
+- 🎯 **Vim/Neovim**: ✅ Complete LSP implementation
+- 📝 **VSCode**: ✅ Native extension
+- ⚡ **Sublime Text**: 🔄 LSP client support (planned)
+- 🎨 **Emacs**: 🔄 LSP client support (planned)
 
 ## 🤝 Contributing
 
-This extension provides a foundation for Argo Workflow development productivity. The codebase is structured for easy extension and maintenance.
+We welcome contributions! The new monorepo architecture makes it easier than ever to contribute.
 
-### Key Extension Points
+### Getting Started
 
-- **New Resource Types**: Add support for other Argo resources
-- **Enhanced Search**: Improve search algorithms and filtering
-- **UI Improvements**: Add status indicators, progress bars, etc.
-- **Additional Features**: Hover information, auto-completion, etc.
+1. Fork the repository
+2. Run `make install && make build`
+3. Make your changes in the appropriate package
+4. Test with both VSCode and Neovim
+5. Submit a pull request
 
----
+### Development Guidelines
 
-**Enjoy seamless Argo Workflow development! 🚀**
-  templates:
-    - name: step1
+- Core functionality goes in `packages/core/`
+- Editor-specific features go in respective packages
+- All new features should work in both editors
+- Add tests for new functionality
+- Update documentation
 
-```
+## 📄 License
 
-## 📖 Usage
+MIT License - see [LICENSE](LICENSE) file for details.
 
-1. **Open** any YAML file containing Argo Workflow definitions
-2. **Ctrl+Click** on any template or WorkflowTemplate name
-3. **Let the extension decide** what action to take based on context:
-   - From references → Navigate to definition
-   - From definitions → Show all references
+## 🎉 Acknowledgments
 
-### Example Scenarios
-
-**Navigate to WorkflowTemplate Definition**:
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Workflow
-spec:
-  workflowTemplateRef:
-    name: my-template  # Ctrl+Click → Go to WorkflowTemplate
-```
-
-**Navigate to Specific Template**:
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Workflow
-spec:
-  templates:
-    - name: main
-      steps:
-        - - name: call-step
-            templateRef:
-              name: tem-tem1
-              template: step1  # Ctrl+Click → Go to template definition
-```
-
-**Find All References**:
-
-```yaml
-# In WorkflowTemplate file
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
-metadata:
-  name: tem-tem1      # Ctrl+Click → Show all WorkflowTemplate references
-spec:
-  templates:
-    - name: step1      # Ctrl+Click → Show all template references
-      container:
-        image: alpine
-```
-
-## 🧪 Testing
-
-### Quick Test
-
-1. **Launch Extension**: Press `F5` in VS Code
-2. **Open Test Files**: Navigate to `test-files` folder in the new window
-3. **Try Navigation**:
-   - Open `workflow.yaml` → Ctrl+Click on `step1` → Should navigate to `tem1.yaml`
-   - Open `tem1.yaml` → Ctrl+Click on `step1` → Should show references panel
-   - Open `tem1.yaml` → Ctrl+Click on `tem-tem1` → Should show WorkflowTemplate references
-
-### Test Files Included
-
-- `tem1.yaml` - Simple WorkflowTemplate with templates
-- `workflow.yaml` - Basic workflow using templates
-- `cronworkflow.yaml` - Scheduled workflow
-- `multiple-templates.yaml` - Multiple WorkflowTemplates with overlapping names
-- `composite-template.yaml` - WorkflowTemplate using other templates
-- Additional test files for comprehensive coverage
-
-## ⚡ Performance Features
-
-- **Parallel Processing**: Multiple files processed concurrently
-- **Intelligent Caching**: File contents cached with auto-invalidation
-- **Smart Filtering**: Automatically skips irrelevant directories (node_modules, .git, etc.)
-- **Cancellation Support**: Long operations can be cancelled for responsive UI
-
-## 🛠️ Development
-
-```bash
-# Install dependencies
-npm install
-
-# Compile TypeScript
-npm run compile
-
-# Watch for changes
-npm run watch
-
-# Test extension
-# Press F5 in VS Code to launch Extension Development Host
-```
-
-## 📋 Requirements
-
-- VS Code 1.80.0 or higher
-- YAML files with proper Argo Workflow structure
-- Workspace with YAML files containing WorkflowTemplate definitions
-
-## 💡 Tips
-
-- **Context Detection**: The extension automatically detects whether you're clicking on a reference or definition
-- **Disambiguation**: When multiple WorkflowTemplates have templates with the same name, the extension uses `templateRef.name` to find the correct one
-- **Cross-File Search**: Searches across all YAML files in your workspace
-- **Error Handling**: Shows informative messages when templates or references aren't found
-
-## 🏗️ Architecture
-
-- **ArgoTemplateDefinitionProvider**: Main provider handling Ctrl+Click navigation
-- **TemplateSearchService**: Core search logic with caching and parallel processing
-- **FileSystemService**: File operations and YAML file discovery
-- **Smart Context Detection**: Determines appropriate action based on cursor position
+- Thanks to the Argo Workflows community for inspiration
+- Built with TypeScript, VSCode API, and Language Server Protocol
+- Special thanks to contributors who helped design the new architecture
 
 ---
+
+**Ready to supercharge your Argo Workflow development? Install now and experience seamless YAML navigation! 🚀**
