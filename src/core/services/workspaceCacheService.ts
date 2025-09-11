@@ -1,5 +1,4 @@
-import * as vscode from 'vscode';
-import { WorkflowTemplateLocation } from '../types';
+import { WorkflowTemplateLocation } from '../types/index';
 
 interface WorkspaceCache {
   templates: Map<string, WorkflowTemplateLocation[]>;
@@ -14,11 +13,6 @@ interface WorkspaceCache {
 export class WorkspaceCacheService {
   private cache: WorkspaceCache | null = null;
   private readonly cacheTimeout = 300000; // 5 minutes
-  private fileWatcher: vscode.FileSystemWatcher | null = null;
-
-  constructor() {
-    this.setupFileWatcher();
-  }
 
   public getCachedTemplates(): Map<string, WorkflowTemplateLocation[]> | null {
     if (!this.cache || this.isCacheExpired()) {
@@ -39,26 +33,8 @@ export class WorkspaceCacheService {
     this.cache = null;
   }
 
-  public dispose(): void {
-    this.fileWatcher?.dispose();
-  }
-
   private isCacheExpired(): boolean {
     if (!this.cache) return true;
     return (Date.now() - this.cache.lastScanned) > this.cacheTimeout;
-  }
-
-  private setupFileWatcher(): void {
-    // Watch for YAML file changes to invalidate cache
-    this.fileWatcher = vscode.workspace.createFileSystemWatcher(
-      '**/*.{yaml,yml}',
-      false, // don't ignore creates
-      false, // don't ignore changes
-      false  // don't ignore deletes
-    );
-
-    this.fileWatcher.onDidChange(() => this.invalidateCache());
-    this.fileWatcher.onDidCreate(() => this.invalidateCache());
-    this.fileWatcher.onDidDelete(() => this.invalidateCache());
   }
 }

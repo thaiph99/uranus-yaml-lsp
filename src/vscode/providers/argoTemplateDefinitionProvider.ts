@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { TemplateSearchService } from "../services/templateSearchService";
-import { TemplateRefContext } from "../types";
+import { TemplateSearchService } from "../../core/services/templateSearchService";
+import { TemplateRefContext } from "../../core/types/index";
 
 /**
  * Definition provider for Argo WorkflowTemplate references in YAML files.
@@ -248,8 +248,7 @@ export class ArgoTemplateDefinitionProvider
     // First try to get the word at the cursor position
     const wordRange = document.getWordRangeAtPosition(
       position,
-      /[\w-]+/
-    );
+      /[\w-]+/);
 
     if (wordRange) {
       const word = document.getText(wordRange);

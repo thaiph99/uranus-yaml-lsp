@@ -1,4 +1,4 @@
-import { WorkflowTemplateLocation, TemplateSearchResult } from "../types";
+import { WorkflowTemplateLocation, TemplateSearchResult } from "../types/index";
 import { FileSystemService } from "./fileSystemService";
 
 interface CachedFileContent {

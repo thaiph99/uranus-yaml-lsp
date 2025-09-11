@@ -36,7 +36,7 @@
   "activationEvents": [
     "onLanguage:yaml"
   ],
-  "main": "./out/extension.js",
+  "main": "./out/src/vscode/extension.js",
   "contributes": {
     "languages": [
       {
@@ -55,12 +55,16 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "compile:vim": "tsc -p ./",
+    "watch:vim": "tsc -watch -p ./",
     "lint": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/vscode": "^1.80.0",
     "@types/node": "^18.0.0",
-    "typescript": "^5.0.0"
-  },
-  "dependencies": {}
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12",
+    "vscode-uri": "^3.1.0"
+  }
 }

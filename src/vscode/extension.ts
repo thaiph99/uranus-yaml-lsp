@@ -1,14 +1,14 @@
 import * as vscode from "vscode";
 import { ArgoTemplateDefinitionProvider } from "./providers/argoTemplateDefinitionProvider";
-import { TemplateSearchService } from "./services/templateSearchService";
-import { FileSystemService } from "./services/fileSystemService";
-import { WorkspaceCacheService } from "./services/workspaceCacheService";
+import { TemplateSearchService } from "../core/services/templateSearchService";
+import { FileSystemService } from "../core/services/fileSystemService";
+
 
 export async function activate(
   context: vscode.ExtensionContext
 ): Promise<void> {
   // Initialize services with dependency injection
-  const workspaceCacheService = new WorkspaceCacheService();
+  
   const fileSystemService = new FileSystemService();
   const templateSearchService = new TemplateSearchService(fileSystemService);
   const definitionProvider = new ArgoTemplateDefinitionProvider(
@@ -24,7 +24,6 @@ export async function activate(
   // Register disposables
   context.subscriptions.push(
     definitionProviderDisposable,
-    workspaceCacheService
   );
 
   await vscode.window.showInformationMessage(
