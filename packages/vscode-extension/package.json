@@ -1,8 +1,8 @@
 {
-  "name": "uranus-yaml",
+  "name": "uranus-yaml-lsp",
   "displayName": "Uranus YAML LSP",
   "description": "Argo Workflow YAML navigation for WorkflowTemplate definitions and references.",
-  "version": "0.0.1",
+  "version": "1.0.1",
   "publisher": "ThaiPham",
   "author": {
     "name": "Thai Pham"
@@ -52,17 +52,18 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build:core && npm run compile && npm run bundle:core",
+    "build:core": "npm --prefix ../core run build",
+    "bundle:core": "node scripts/bundleCoreDependency.js",
     "build": "tsc -p ./",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "tsc --noEmit",
     "clean": "rimraf out"
   },
-  "dependencies": {
-    "@uranus-yaml/core": "^0.0.1"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "@uranus-yaml/core": "^0.0.1",
     "@types/vscode": "^1.80.0",
     "@types/node": "^18.0.0",
     "typescript": "^5.0.0",

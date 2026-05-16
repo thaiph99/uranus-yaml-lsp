@@ -1,0 +1,10 @@
+../**
+../../**
+node_modules/**
+src/**
+scripts/**
+tsconfig.json
+*.vsix
+out/**/*.map
+out/**/*.d.ts
+out/providers/argoTemplateDefinitionProvider.js

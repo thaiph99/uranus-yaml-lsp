@@ -7,7 +7,7 @@ This package provides the VS Code adapter for Uranus YAML. It registers a YAML d
 From the VS Code Marketplace:
 
 ```bash
-code --install-extension ThaiPham.uranus-yaml
+code --install-extension ThaiPham.uranus-yaml-lsp
 ```
 
 From this repository:
@@ -16,7 +16,7 @@ From this repository:
 make install
 npm run build:vscode
 npm run package:vscode
-code --install-extension packages/vscode-extension/uranus-yaml-*.vsix
+code --install-extension packages/vscode-extension/uranus-yaml-lsp-*.vsix
 ```
 
 ## Usage

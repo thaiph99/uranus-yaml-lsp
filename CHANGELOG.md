@@ -1,6 +1,32 @@
 # Change Log
 
-All notable changes to the "uranus-yaml" extension will be documented in this file.
+All notable changes to the "uranus-yaml-lsp" extension will be documented in this file.
+
+## [1.0.1] - 2026-05-16
+
+### Changed
+- Refactored navigation logic into a shared `yaml-navigation` service in the core package, eliminating duplication between the LSP server and VS Code extension adapters
+- VS Code extension and LSP handlers now both delegate to the shared navigation service
+- Reduced notification noise in the VS Code extension (fewer pop-up messages during normal usage)
+- Renamed workspace and package metadata for consistency across the monorepo
+
+### Added
+- Navigation tests for the core package
+
+### Fixed
+- Quieter editor experience: suppressed redundant status notifications
+
+### Documentation
+- Rewrote editor usage guides (VS Code and LSP) for clarity
+- Simplified root project README
+- Cleaned up package READMEs (removed decorative icons)
+
+## [1.0.0] - 2025-09-12
+
+### Added
+- Full LSP (Language Server Protocol) server implementation for Argo WorkflowTemplate navigation
+- Standalone `lsp-server` package enabling editor-agnostic go-to-definition and find-references
+- Core navigation package extracted as a shared library
 
 ## [0.0.1] - 2025-07-03
 

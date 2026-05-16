@@ -27,7 +27,7 @@ The core package owns workspace scanning, template search, caching, and cursor-c
 Install the extension from the marketplace:
 
 ```bash
-code --install-extension ThaiPham.uranus-yaml
+code --install-extension ThaiPham.uranus-yaml-lsp
 ```
 
 Or build it from source:
@@ -36,7 +36,7 @@ Or build it from source:
 make install
 npm run build:vscode
 npm run package:vscode
-code --install-extension packages/vscode-extension/uranus-yaml-*.vsix
+code --install-extension packages/vscode-extension/uranus-yaml-lsp-*.vsix
 ```
 
 Open a workspace that contains Argo YAML files, then Ctrl+Click a WorkflowTemplate name or template name. VS Code uses the extension's definition provider to jump to definitions or show references.
