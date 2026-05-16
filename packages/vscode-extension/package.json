@@ -1,5 +1,5 @@
 {
-  "name": "uranus-yaml-lsp",
+  "name": "uranus-yaml",
   "displayName": "Uranus YAML LSP",
   "description": "Argo Workflow YAML navigation for WorkflowTemplate definitions and references.",
   "version": "1.0.1",
