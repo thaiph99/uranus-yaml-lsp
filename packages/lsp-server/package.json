@@ -1,7 +1,7 @@
 {
   "name": "@uranus-yaml/lsp-server",
   "version": "0.0.1",
-  "description": "LSP server for Argo YAML template navigation in Neovim",
+  "description": "Language Server Protocol server for Argo Workflow YAML navigation",
   "main": "./dist/server.js",
   "bin": {
     "uranus-yaml-lsp": "./bin/uranus-yaml-lsp"

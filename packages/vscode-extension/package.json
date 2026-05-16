@@ -1,7 +1,7 @@
 {
   "name": "uranus-yaml",
-  "displayName": "Uranus YAML - Argo Workflow Navigator",
-  "description": "Intelligent Ctrl+Click navigation for Argo WorkflowTemplate references in YAML files. Navigate seamlessly between template definitions and usages.",
+  "displayName": "Uranus YAML LSP",
+  "description": "Argo Workflow YAML navigation for WorkflowTemplate definitions and references.",
   "version": "0.0.1",
   "publisher": "ThaiPham",
   "author": {
@@ -10,12 +10,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/thaiph99/uranus-yaml-vscode.git"
+    "url": "https://github.com/thaiph99/uranus-yaml-lsp.git"
   },
   "bugs": {
-    "url": "https://github.com/thaiph99/uranus-yaml-vscode/issues"
+    "url": "https://github.com/thaiph99/uranus-yaml-lsp/issues"
   },
-  "homepage": "https://github.com/thaiph99/uranus-yaml-vscode#readme",
+  "homepage": "https://github.com/thaiph99/uranus-yaml-lsp#readme",
   "keywords": [
     "yaml",
     "argo",

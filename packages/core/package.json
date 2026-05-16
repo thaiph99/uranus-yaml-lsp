@@ -1,7 +1,7 @@
 {
   "name": "@uranus-yaml/core",
   "version": "0.0.1",
-  "description": "Core functionality for Argo YAML template navigation",
+  "description": "Shared Argo Workflow YAML navigation engine",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
