@@ -2,15 +2,15 @@
 
 A Language Server Protocol (LSP) implementation for Argo YAML template navigation in Neovim and other LSP-compatible editors.
 
-## ✨ Features
+## Features
 
-- **🎯 Go to Definition**: Navigate from template references to their definitions
-- **🔍 Find References**: Show all usages of templates and WorkflowTemplates
-- **⚡ High Performance**: Parallel processing and intelligent caching
-- **🧠 Smart Context Detection**: Understands Argo Workflow structure
-- **🌐 Cross-Resource Support**: Works with Workflows, WorkflowTemplates, CronWorkflows
+- **Go to Definition**: Navigate from template references to their definitions
+- **Find References**: Show all usages of templates and WorkflowTemplates
+- **High Performance**: Parallel processing and intelligent caching
+- **Smart Context Detection**: Understands Argo Workflow structure
+- **Cross-Resource Support**: Works with Workflows, WorkflowTemplates, CronWorkflows
 
-## 🚀 Installation
+## Installation
 
 ### From npm (Recommended)
 ```bash
@@ -27,7 +27,7 @@ make build
 make install-lsp
 ```
 
-## 🔧 Neovim Setup
+## Neovim Setup
 
 ### Using nvim-lspconfig
 
@@ -113,7 +113,7 @@ lspconfig.uranus_yaml.setup{
 }
 ```
 
-## 🎯 Usage
+## Usage
 
 Once configured, the LSP provides these features in YAML files:
 
@@ -132,7 +132,7 @@ Once configured, the LSP provides these features in YAML files:
 3. **Press `gd`** to go to definition or **`gr`** to find references
 4. **Navigate between files** seamlessly
 
-## 🔧 Configuration
+## Configuration
 
 The LSP server works with minimal configuration but supports these options:
 
@@ -154,7 +154,7 @@ By default, the server activates for:
 - **Concurrency**: Processes up to 10 files in parallel
 - **Directory Filtering**: Skips `node_modules`, `.git`, etc.
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### LSP not starting?
 ```bash
@@ -180,7 +180,7 @@ uranus-yaml-lsp --stdio
 2. Consider adding more directories to the ignore list
 3. Monitor memory usage with `:LspInfo`
 
-## 🔍 Debugging
+## Debugging
 
 ### Enable LSP Logging
 ```lua
@@ -198,7 +198,7 @@ vim.lsp.set_log_level("debug")
 :LspInfo
 ```
 
-## 🛠️ Development
+## Development
 
 ### Building from Source
 ```bash
@@ -222,7 +222,7 @@ echo '{}' | uranus-yaml-lsp --stdio
 # In Neovim, test with a YAML file containing Argo Workflows
 ```
 
-## 📄 API
+## API
 
 The LSP server implements these LSP methods:
 
@@ -232,10 +232,10 @@ The LSP server implements these LSP methods:
 - `textDocument/didOpen` - Document opened
 - `textDocument/didChange` - Document changed
 
-## 🤝 Contributing
+## Contributing
 
 This LSP server shares core functionality with the VSCode extension. See the main repository README for contributing guidelines.
 
-## 📄 License
+## License
 
 MIT License - see LICENSE file for details.
