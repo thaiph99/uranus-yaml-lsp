@@ -1,133 +1,97 @@
-# Uranus YAML - VSCode Extension
+# Uranus YAML VS Code Extension
 
-A VS Code extension that enables intelligent **Ctrl+Click** navigation for Argo WorkflowTemplate references in YAML files. Navigate seamlessly between template definitions and their usages across your entire workspace.
+This package provides the VS Code adapter for Uranus YAML. It registers a YAML definition provider and delegates Argo Workflow navigation to `@uranus-yaml/core`.
 
-## Features
+## Install
 
-- **Smart Context-Aware Navigation**: Single Ctrl+Click does different actions based on where you click
-- **Go to Definition**: Navigate from template references to their definitions
-- **Find All References**: Show all usages of templates and WorkflowTemplates
-- **High Performance**: Parallel processing, intelligent caching, and smart filtering
-- **Intelligent Disambiguation**: Handles multiple templates with same names correctly
-- **Cross-Resource Support**: Works with Workflows, WorkflowTemplates, CronWorkflows, etc.
+From the VS Code Marketplace:
 
-## Installation
-
-### From VSCode Marketplace
 ```bash
-# Search for "Uranus YAML" in VSCode Extensions marketplace
-# Or install via command line:
 code --install-extension ThaiPham.uranus-yaml
 ```
 
-### Manual Installation
+From this repository:
+
 ```bash
-# Build and install from source
+make install
 npm run build:vscode
 npm run package:vscode
-code --install-extension uranus-yaml-*.vsix
+code --install-extension packages/vscode-extension/uranus-yaml-*.vsix
 ```
 
 ## Usage
 
-1. **Open** any YAML file containing Argo Workflow definitions
-2. **Ctrl+Click** on any template or WorkflowTemplate name
-3. **Let the extension decide** what action to take based on context
+1. Open a workspace that contains Argo Workflow YAML files.
+2. Open a `.yaml` or `.yml` file.
+3. Ctrl+Click a template or WorkflowTemplate name.
 
-### Navigation Contexts
+Supported navigation:
 
-#### Template Reference to Go to Definition
-**When**: Ctrl+Click on template references in usage files
-**Action**: Navigate to template definition
+- `templateRef.template`: jump to the template definition.
+- `templateRef.name`: jump to the WorkflowTemplate definition.
+- `workflowTemplateRef.name`: jump to the WorkflowTemplate definition.
+- Template definitions under `spec.templates`: show template references.
+- WorkflowTemplate `metadata.name`: show WorkflowTemplate references.
+
+## Example
+
+Reference:
 
 ```yaml
-# In workflow.yaml - Ctrl+Click on "step1":
 templateRef:
   name: tem-tem1
-  template: step1  # Ctrl+Click here goes to definition in tem1.yaml
+  template: step1
 ```
 
-#### Template Definition to Find All References
-**When**: Ctrl+Click on template names in WorkflowTemplate definition files
-**Action**: Show all references to this template
+Definition:
 
 ```yaml
-# In tem1.yaml - Ctrl+Click on "step1":
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: tem-tem1
 spec:
   templates:
-    - name: step1  # Ctrl+Click here shows all references
+    - name: step1
       container:
         image: alpine
 ```
 
-#### WorkflowTemplate Name to Find All References
-**When**: Ctrl+Click on WorkflowTemplate names in metadata section
-**Action**: Show all references to this WorkflowTemplate
-
-```yaml
-# In tem1.yaml - Ctrl+Click on "tem-tem1":
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
-metadata:
-  name: tem-tem1  # Ctrl+Click here shows all WorkflowTemplate references
-```
-
-## Requirements
-
-- VS Code 1.80.0 or higher
-- YAML language support (usually built-in)
-- Files must be in a workspace folder
-
 ## Development
 
+Build only the VS Code extension:
+
 ```bash
-# Install dependencies
-npm install
-
-# Compile TypeScript
-npm run compile
-
-# Watch for changes
-npm run watch
-
-# Test extension (Press F5 in VS Code)
+npm run build:vscode
 ```
 
-## Configuration
+Watch extension sources:
 
-The extension works out-of-the-box with no configuration required. It automatically:
-- Detects YAML files with Argo Workflow content
-- Caches file contents for performance
-- Filters out irrelevant directories (node_modules, .git, etc.)
-- Provides context-aware navigation
+```bash
+cd packages/vscode-extension
+npm run watch
+```
 
-## Performance Features
+Manual test flow:
 
-- **Parallel Processing**: Multiple files processed concurrently
-- **Intelligent Caching**: File contents cached with auto-invalidation
-- **Smart Filtering**: Automatically skips irrelevant directories
-- **Cancellation Support**: Long operations can be cancelled for responsive UI
+1. Press F5 in VS Code to open an Extension Development Host.
+2. Open `packages/core/test-files`.
+3. Ctrl+Click `tem-tem1` and `step1` in the fixtures.
+4. Confirm navigation resolves definitions and references without notification popups.
+
+Package the extension:
+
+```bash
+npm run package:vscode
+```
 
 ## Troubleshooting
 
-### Extension not working?
-- Confirm the extension is enabled and the current file is a `.yaml` or `.yml` file
-- Try clicking directly on the template name, not surrounding whitespace
+- Confirm the file is a `.yaml` or `.yml` file.
+- Confirm the workspace contains the referenced WorkflowTemplate files.
+- Place the cursor directly on the template or WorkflowTemplate name.
+- Open VS Code Developer Tools to inspect extension errors.
 
-### No results found?
-- Verify YAML structure is correct (proper indentation)
-- Check that WorkflowTemplate and template names match exactly
-- Look for typos in template names
+## Package boundary
 
-### Performance issues?
-- Large workspaces may take longer to search
-- Check VS Code Developer Console for error messages
-- Try reloading the window (Ctrl+R)
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-This extension is part of a monorepo that also includes an LSP server for Neovim. See the main README for contributing guidelines.
+The VS Code extension should stay thin. Shared parsing, context resolution, workspace search, and cache logic belong in `@uranus-yaml/core`.
