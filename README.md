@@ -1,71 +1,61 @@
-# Uranus YAML - Argo Workflow Navigator
+# Uranus YAML
 
-🚀 **Universal Argo YAML navigation for both VSCode and Neovim!**
+Uranus YAML provides Argo Workflow YAML navigation for VSCode and Neovim. It lets you jump from `templateRef` and WorkflowTemplate references to their definitions, and find references from template definitions.
 
-A powerful, intelligent navigation system for Argo Workflows that provides seamless **Ctrl+Click** (VSCode) and **go-to-definition** (Neovim) functionality across WorkflowTemplate references in YAML files.
+## Features
 
-## ✨ What's New in v2.0
+- Go to WorkflowTemplate and template definitions from YAML references.
+- Find usages of templates and WorkflowTemplates across the workspace.
+- Share one TypeScript core between the VSCode extension and the LSP server.
+- Search YAML files with caching, directory filtering, and bounded concurrency.
+- Handle common Argo resources such as `Workflow`, `WorkflowTemplate`, and `CronWorkflow`.
 
-- 🏗️ **Complete Restructure**: Monorepo architecture with shared core functionality
-- 🔧 **Neovim Support**: Full LSP server implementation for Neovim users
-- ⚡ **90% Code Reuse**: Shared core logic eliminates duplication
-- 🎯 **Better Performance**: Optimized architecture with improved caching
-- 🧩 **Modular Design**: Clean separation between editor-specific and core functionality
+## Packages
 
-## 🎯 Features
+```text
+packages/
+├── core/              Shared search, parsing, and filesystem logic
+├── lsp-server/        Language Server Protocol server for Neovim and other LSP clients
+├── vscode-extension/  VSCode extension entry point and providers
+└── shared-config/     Shared TypeScript configuration
+```
 
-### Core Functionality (Both Editors)
+## Installation
 
-- **🎯 Smart Context-Aware Navigation**: Automatically detects whether to go to definition or find references
-- **📍 Go to Definition**: Navigate from template references to their definitions
-- **🔍 Find All References**: Show all usages of templates and WorkflowTemplates
-- **🎨 Intelligent Disambiguation**: Handles multiple templates with same names correctly
-- **🌐 Cross-Resource Support**: Works with Workflows, WorkflowTemplates, CronWorkflows, etc.
+### VSCode
 
-### Performance & Quality
-
-- **⚡ High Performance**: Parallel processing, intelligent caching, and smart filtering
-- **🧠 Smart Context Detection**: Understands Argo Workflow YAML structure
-- **🔄 Real-time Updates**: File changes are detected and processed automatically
-- **🛡️ Error Handling**: Graceful handling of malformed YAML and missing files
-
-## 📦 Installation
-
-### For VSCode Users
+Install from the marketplace:
 
 ```bash
-# Install from marketplace
 code --install-extension ThaiPham.uranus-yaml
+```
 
-# Or build from source
+Or build from source:
+
+```bash
 npm run build:vscode
 npm run package:vscode
 ```
 
-### For Neovim Users
+### Neovim
+
+Install the LSP server globally:
 
 ```bash
-# Install globally via npm
 npm install -g @uranus-yaml/lsp-server
+```
 
-# Or build from source
+Or build from source:
+
+```bash
 make install
 make build
 make install-lsp
 ```
 
-## 🚀 Quick Start
-
-### VSCode Setup
-
-1. Install the extension from the marketplace
-2. Open any YAML file with Argo Workflows
-3. **Ctrl+Click** on template names to navigate!
-
-### Neovim Setup
+Add the server to your Neovim LSP config:
 
 ```lua
--- Add to your Neovim config
 local lspconfig = require('lspconfig')
 local configs = require('lspconfig.configs')
 
@@ -83,247 +73,99 @@ end
 lspconfig.uranus_yaml.setup{}
 ```
 
-## 🎯 Navigation Examples
+## Usage
 
-### 1. Template Reference → Definition
+Open an Argo YAML file and use the editor's normal navigation commands:
+
+- VSCode: Ctrl+Click on a template or WorkflowTemplate name.
+- Neovim: use LSP commands such as `gd` for definition and `gr` for references.
+
+Example reference:
 
 ```yaml
-# In workflow.yaml - Ctrl+Click or gd on "step1"
 templateRef:
   name: my-workflow-template
-  template: step1  # ← Navigate to definition
+  template: step1
 ```
 
-### 2. Template Definition → References
+Example definition:
 
 ```yaml
-# In template.yaml - Ctrl+Click or gr on "step1"
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: my-workflow-template
 spec:
   templates:
-    - name: step1  # ← Find all references
+    - name: step1
       container:
         image: alpine
 ```
 
-### 3. WorkflowTemplate → All References
+## Development
 
-```yaml
-# In template.yaml - Ctrl+Click or gr on template name
-metadata:
-  name: my-workflow-template  # ← Find all uses
-```
-
-## 🏗️ Architecture
-
-```
-packages/
-├── core/                    # 🎯 Shared functionality (90% of code)
-│   ├── services/           # Template search, file system, caching
-│   ├── types/              # TypeScript definitions
-│   └── index.ts            # Public API
-├── vscode-extension/        # 📝 VSCode-specific implementation
-│   ├── providers/          # VSCode definition provider
-│   └── extension.ts        # Extension entry point
-├── lsp-server/             # 🔧 Neovim LSP server
-│   ├── handlers/           # LSP protocol handlers
-│   ├── server.ts           # LSP server implementation
-│   └── bin/                # Executable
-└── shared-config/          # ⚙️ Shared build configuration
-```
-
-### Key Benefits of New Architecture
-
-1. **🔄 Code Reuse**: 90% of functionality is shared between editors
-2. **🧪 Easier Testing**: Core logic can be tested independently
-3. **🚀 Faster Development**: New features benefit both editors automatically
-4. **📈 Better Maintainability**: Single source of truth for business logic
-5. **🎯 Editor-Specific Optimization**: Each package optimized for its target
-
-## 🛠️ Development
-
-### Prerequisites
+Prerequisites:
 
 - Node.js 18+
 - npm 8+
 - TypeScript 5+
 
-### Build All Packages
+Common commands:
 
 ```bash
-# Install dependencies
-make install
-
-# Build everything
-make build
-
-# Watch for changes
-make watch
-
-# Package for distribution
-make package
+make install        # install dependencies
+make build          # build all packages
+make watch          # watch all packages
+make package        # create release packages
+make dev-lsp        # build and run the LSP server locally
 ```
 
-### Individual Package Development
+Package-specific commands:
 
 ```bash
-# Core package
 npm run build:core
-
-# LSP server
 npm run build:lsp
-make dev-lsp  # Start in development mode
-
-# VSCode extension
 npm run build:vscode
 ```
 
-### Testing
+## Testing and verification
+
+Run the automated core navigation tests:
 
 ```bash
-# Test VSCode extension
-# Press F5 in VSCode to launch Extension Development Host
-
-# Test LSP server
-make dev-lsp
-# Then configure Neovim to connect to the server
+make test
 ```
 
-## 📊 Performance Optimizations
+Before editor checks, build all packages:
 
-### Intelligent Caching
-
-- **File Content Caching**: 30-second cache with automatic cleanup
-- **Search Result Caching**: Avoid redundant searches
-- **Smart Invalidation**: Cache invalidated on file changes
-
-### Parallel Processing
-
-- **Concurrent File Processing**: Up to 10 files processed simultaneously
-- **Batch Operations**: Directory traversal in controlled batches
-- **Cancellation Support**: Long operations can be cancelled
-
-### Smart Filtering
-
-- **Directory Exclusion**: Automatically skips `node_modules`, `.git`, etc.
-- **File Type Detection**: Only processes `.yaml` and `.yml` files
-- **Depth Limiting**: Prevents infinite recursion in symlinked directories
-
-## 🔧 Configuration
-
-### VSCode
-
-No configuration required - works out of the box!
-
-### Neovim
-
-```lua
--- Optional: Custom root detection
-lspconfig.uranus_yaml.setup{
-  root_dir = lspconfig.util.root_pattern(
-    '.git',
-    'package.json',
-    'kustomization.yaml',
-    '.argocd'
-  ),
-
-  -- Optional: Custom file types
-  filetypes = { 'yaml', 'yml' },
-
-  -- Optional: Performance tuning
-  flags = {
-    debounce_text_changes = 150,
-  }
-}
+```bash
+make build
 ```
 
-## 🐛 Troubleshooting
+Manual checklist with fixtures from `packages/core/test-files`:
 
-### Common Issues
+- VSCode: open a fixture YAML file in the Extension Development Host, then Ctrl+Click a WorkflowTemplate reference and a template name.
+- Neovim: run the LSP server, open the same fixtures, then use `gd` for definitions and `gr` for references.
+- Confirm `tem-tem1` and `step1` navigate to `tem1.yaml`, and references include `workflow-with-workflowtemplate-ref.yaml`.
 
-**Extension/LSP not working?**
+## Troubleshooting
 
-- Ensure you're in a YAML file with valid Argo Workflow syntax
-- Check that you're clicking directly on template names
-- Verify workspace has proper root directory structure
+If navigation does not work:
 
-**No results found?**
+- Confirm the file extension is `.yaml` or `.yml`.
+- Confirm the file contains valid Argo Workflow YAML.
+- Click or place the cursor directly on the template or WorkflowTemplate name.
+- Check that the referenced template exists in the workspace.
 
-- Verify YAML indentation is correct
-- Check for typos in template/WorkflowTemplate names
-- Ensure referenced templates exist in the workspace
+For Neovim, use `:LspInfo` and `:LspLog` to inspect server status and logs.
 
-**Performance issues?**
+## Contributing
 
-- Check workspace size (very large repositories may be slower)
-- Monitor memory usage and consider excluding large directories
-- Enable debug logging to identify bottlenecks
+- Put shared behavior in `packages/core`.
+- Keep editor-specific behavior in the VSCode extension or LSP server package.
+- Keep public package APIs exported from each package's `src/index.ts`.
+- Validate changes with `make build` and manual cross-editor navigation checks.
 
-### Debug Logging
+## License
 
-**VSCode:**
-
-```typescript
-// Open Developer Tools → Console
-// Look for "ArgoTemplateDefinitionProvider" logs
-```
-
-**Neovim:**
-
-```lua
--- Enable debug logging
-vim.lsp.set_log_level("debug")
-
--- View logs
-:LspLog
-```
-
-## 📈 Roadmap
-
-### Planned Features
-
-- 🎨 **Hover Information**: Show template details on hover
-- 🔍 **Workspace Symbols**: Search for templates across workspace
-- 🎯 **Auto-completion**: Intelligent template name suggestions
-- 📝 **Validation**: Real-time YAML structure validation
-- 🔗 **Link Following**: Navigate to external template files
-
-### Editor Support
-
-- 🎯 **Vim/Neovim**: ✅ Complete LSP implementation
-- 📝 **VSCode**: ✅ Native extension
-- ⚡ **Sublime Text**: 🔄 LSP client support (planned)
-- 🎨 **Emacs**: 🔄 LSP client support (planned)
-
-## 🤝 Contributing
-
-We welcome contributions! The new monorepo architecture makes it easier than ever to contribute.
-
-### Getting Started
-
-1. Fork the repository
-2. Run `make install && make build`
-3. Make your changes in the appropriate package
-4. Test with both VSCode and Neovim
-5. Submit a pull request
-
-### Development Guidelines
-
-- Core functionality goes in `packages/core/`
-- Editor-specific features go in respective packages
-- All new features should work in both editors
-- Add tests for new functionality
-- Update documentation
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🎉 Acknowledgments
-
-- Thanks to the Argo Workflows community for inspiration
-- Built with TypeScript, VSCode API, and Language Server Protocol
-- Special thanks to contributors who helped design the new architecture
-
----
-
-**Ready to supercharge your Argo Workflow development? Install now and experience seamless YAML navigation! 🚀**
+MIT. See `LICENSE` for details.
