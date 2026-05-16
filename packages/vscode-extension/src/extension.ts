@@ -2,9 +2,7 @@ import * as vscode from "vscode";
 import { ArgoTemplateDefinitionProvider } from "./providers/argoTemplateDefinitionProvider";
 import { TemplateSearchService, FileSystemService, WorkspaceCacheService } from "@uranus-yaml/core";
 
-export async function activate(
-  context: vscode.ExtensionContext
-): Promise<void> {
+export function activate(context: vscode.ExtensionContext): void {
   // Initialize services with dependency injection
   const workspaceCacheService = new WorkspaceCacheService();
   const fileSystemService = new FileSystemService();
@@ -23,10 +21,6 @@ export async function activate(
   context.subscriptions.push(
     definitionProviderDisposable,
     workspaceCacheService
-  );
-
-  await vscode.window.showInformationMessage(
-    "Uranus YAML extension activated."
   );
 }
 

@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
-import { TemplateSearchService, TemplateRefContext } from "@uranus-yaml/core";
+import {
+  TemplateSearchService,
+  TemplateRefContext,
+  WorkflowTemplateLocation
+} from "@uranus-yaml/core";
 
 export class ArgoTemplateDefinitionProvider implements vscode.DefinitionProvider {
   constructor(private readonly templateSearchService: TemplateSearchService) {}
@@ -153,19 +157,10 @@ export class ArgoTemplateDefinitionProvider implements vscode.DefinitionProvider
       }
 
       if (searchResult.locations.length === 0) {
-        void vscode.window.showWarningMessage(
-          `Template '${context.templateName}' not found in WorkflowTemplate '${context.workflowTemplateName}'.`
-        );
         return undefined;
       }
 
-      return searchResult.locations.map(
-        (location: any) =>
-          new vscode.Location(
-            vscode.Uri.file(location.file),
-            new vscode.Position(location.line, 0)
-          )
-      );
+      return this.toVsCodeLocations(searchResult.locations);
     } catch (error) {
       console.error("Error finding template in WorkflowTemplate:", error);
       return undefined;
@@ -192,27 +187,10 @@ export class ArgoTemplateDefinitionProvider implements vscode.DefinitionProvider
       }
 
       if (searchResult.locations.length === 0) {
-        if (templateName !== "main" && templateName !== "default") {
-          void vscode.window.showWarningMessage(
-            `WorkflowTemplate '${templateName}' not found.`
-          );
-        }
         return undefined;
       }
 
-      if (searchResult.locations.length > 1) {
-        void vscode.window.showInformationMessage(
-          `Found ${searchResult.locations.length} WorkflowTemplate definitions for '${templateName}'`
-        );
-      }
-
-      return searchResult.locations.map(
-        (location: any) =>
-          new vscode.Location(
-            vscode.Uri.file(location.file),
-            new vscode.Position(location.line, 0)
-          )
-      );
+      return this.toVsCodeLocations(searchResult.locations);
     } catch (error) {
       console.error("Error finding template definition:", error);
       return undefined;
@@ -387,28 +365,11 @@ export class ArgoTemplateDefinitionProvider implements vscode.DefinitionProvider
         return undefined;
       }
 
-      const locations = searchResult.locations.map(
-        (location: any) =>
-          new vscode.Location(
-            vscode.Uri.file(location.file),
-            new vscode.Position(location.line, 0)
-          )
-      );
-
-      if (locations.length > 0) {
-        void vscode.window.showInformationMessage(
-          `Found ${locations.length} reference(s) to template '${templateContext.templateName}' from WorkflowTemplate '${templateContext.workflowTemplateName}'`
-        );
-      } else {
-        void vscode.window.showWarningMessage(
-          `No references found for template '${templateContext.templateName}' from WorkflowTemplate '${templateContext.workflowTemplateName}'`
-        );
-      }
+      const locations = this.toVsCodeLocations(searchResult.locations);
 
       return locations;
     } catch (error) {
       console.error("Error finding template references:", error);
-      void vscode.window.showErrorMessage(`Error finding references: ${error}`);
       return undefined;
     }
   }
@@ -481,29 +442,24 @@ export class ArgoTemplateDefinitionProvider implements vscode.DefinitionProvider
         return undefined;
       }
 
-      const locations = searchResult.locations.map(
-        (location: any) =>
-          new vscode.Location(
-            vscode.Uri.file(location.file),
-            new vscode.Position(location.line, 0)
-          )
-      );
-
-      if (locations.length > 0) {
-        void vscode.window.showInformationMessage(
-          `Found ${locations.length} reference(s) to WorkflowTemplate '${workflowTemplateName}'`
-        );
-      } else {
-        void vscode.window.showWarningMessage(
-          `No references found for WorkflowTemplate '${workflowTemplateName}'`
-        );
-      }
+      const locations = this.toVsCodeLocations(searchResult.locations);
 
       return locations;
     } catch (error) {
       console.error("Error finding WorkflowTemplate references:", error);
-      void vscode.window.showErrorMessage(`Error finding references: ${error}`);
       return undefined;
     }
+  }
+
+  private toVsCodeLocations(
+    locations: readonly WorkflowTemplateLocation[]
+  ): vscode.Location[] {
+    return locations.map(
+      (location) =>
+        new vscode.Location(
+          vscode.Uri.file(location.file),
+          new vscode.Position(location.line, 0)
+        )
+    );
   }
 }
