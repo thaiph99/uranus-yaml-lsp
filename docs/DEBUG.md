@@ -4,7 +4,7 @@
 
 The extension now uses **Ctrl+Click** for smart navigation based on context:
 
-### Context 1: Template Reference → Go to Definition
+### Context 1: Template Reference to Go to Definition
 **When**: Ctrl+Click on template references in usage files
 **Action**: Navigate to template definition
 
@@ -12,10 +12,10 @@ The extension now uses **Ctrl+Click** for smart navigation based on context:
 # In workflow.yaml - Ctrl+Click on "step1":
 templateRef:
   name: tem-tem1
-  template: step1  # ← Ctrl+Click here goes to definition
+  template: step1  # Ctrl+Click here goes to definition
 ```
 
-### Context 2: Template Definition → Find All References
+### Context 2: Template Definition to Find All References
 **When**: Ctrl+Click on template names in WorkflowTemplate definition files
 **Action**: Show all references to this template
 
@@ -23,12 +23,12 @@ templateRef:
 # In tem1.yaml - Ctrl+Click on "step1":
 spec:
   templates:
-    - name: step1  # ← Ctrl+Click here shows all references
+    - name: step1  # Ctrl+Click here shows all references
       container:
         image: alpine
 ```
 
-### Context 3: WorkflowTemplate Name Definition → Find All References
+### Context 3: WorkflowTemplate Name Definition to Find All References
 **When**: Ctrl+Click on WorkflowTemplate names in metadata section
 **Action**: Show all references to this WorkflowTemplate
 
@@ -37,7 +37,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: tem-tem1  # ← Ctrl+Click here shows all WorkflowTemplate references
+  name: tem-tem1  # Ctrl+Click here shows all WorkflowTemplate references
 spec:
   templates:
     - name: step1

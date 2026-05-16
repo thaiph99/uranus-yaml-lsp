@@ -18,7 +18,7 @@ Your VS Code extension now supports **two complementary features** for Argo Work
 # In workflow.yaml - Ctrl+Click on "step1" here:
 templateRef:
   name: tem-tem1
-  template: step1  # ← Click here goes to tem1.yaml line 7
+  template: step1  # Click here to go to tem1.yaml line 7
 ```
 
 ### 2. Find All References (Ctrl+Click in definition files)
@@ -30,7 +30,7 @@ templateRef:
 # In tem1.yaml - Ctrl+Click on "step1" here:
 spec:
   templates:
-    - name: step1  # ← Click here shows all references
+    - name: step1  # Click here to show all references
       container:
         image: alpine
 ```
@@ -40,12 +40,12 @@ spec:
 ### Scenario 1: "Where is this template defined?"
 1. Open `workflow.yaml`
 2. Ctrl+Click on `step1` in `templateRef.template`
-3. → Jumps to `tem1.yaml` template definition
+3. Jumps to `tem1.yaml` template definition
 
 ### Scenario 2: "Where is this template used?"
 1. Open `tem1.yaml`
 2. Ctrl+Click on `step1` in `- name: step1`
-3. → Shows references panel with all usages:
+3. Shows references panel with all usages:
    - `workflow.yaml` line 13
    - `cronworkflow.yaml` line 13
    - `composite-template.yaml` lines 8, 19
@@ -72,7 +72,6 @@ spec:
 - **Go to Definition**: Uses VS Code's built-in "Go to Definition" (F12)
 - **Find All References**: Uses VS Code's built-in "Find All References" (Shift+F12)
 - **References Panel**: Shows in VS Code's References view with file paths and line numbers
-- **Status Messages**: Informational messages about number of references found
 
 ## Performance Features
 

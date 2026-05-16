@@ -13,46 +13,46 @@ This guide explains how to test both the "Go to Definition" and "Find All Refere
    - Open `workflow.yaml`
    - Find line 13: `template: step1`
    - Hold `Ctrl` and click on `step1`
-   - ✅ **Expected**: Navigate to `tem1.yaml` line 7 (`- name: step1`)
+   - **Expected**: Navigate to `tem1.yaml` line 7 (`- name: step1`)
 
 3. **Test Find All References**:
    - Open `tem1.yaml`
    - Find line 7: `- name: step1`
    - Hold `Ctrl` and click on `step1`
-   - ✅ **Expected**: Show references panel with all places where `step1` from `tem-tem1` is used
+   - **Expected**: Show references panel with all places where `step1` from `tem-tem1` is used
 
 ## Comprehensive Test Cases
 
 ### Test Case 1: Basic Template Navigation (Go to Definition)
 **File**: `workflow.yaml`
-- `Ctrl+Click` on `tem-tem1` (line 12) → Should go to `tem1.yaml` line 4 (WorkflowTemplate name)
-- `Ctrl+Click` on `step1` (line 13) → Should go to `tem1.yaml` line 7 (template definition)
+- `Ctrl+Click` on `tem-tem1` (line 12) should go to `tem1.yaml` line 4 (WorkflowTemplate name)
+- `Ctrl+Click` on `step1` (line 13) should go to `tem1.yaml` line 7 (template definition)
 
 ### Test Case 2: Find All References
 **File**: `tem1.yaml`
-- `Ctrl+Click` on `step1` (line 7) → Should show references in:
+- `Ctrl+Click` on `step1` (line 7) should show references in:
   - `workflow.yaml` line 13
   - `cronworkflow.yaml` line 13
   - `composite-template.yaml` line 8 and line 19
-- `Ctrl+Click` on `step2` (line 12) → Should show references in:
+- `Ctrl+Click` on `step2` (line 12) should show references in:
   - `cronworkflow.yaml` line 17
   - `composite-template.yaml` line 23
 
 ### Test Case 3: Disambiguating Same Template Names
 **File**: `complex-workflow.yaml`
-- `Ctrl+Click` on `step1` at line 14 → Should go to `multiple-templates.yaml` line 7 (template-a step1)
-- `Ctrl+Click` on `step1` at line 19 → Should go to `multiple-templates.yaml` line 21 (template-b step1)
+- `Ctrl+Click` on `step1` at line 14 should go to `multiple-templates.yaml` line 7 (template-a step1)
+- `Ctrl+Click` on `step1` at line 19 should go to `multiple-templates.yaml` line 21 (template-b step1)
 
 **File**: `multiple-templates.yaml`
-- `Ctrl+Click` on `step1` at line 7 → Should show references only to template-a step1
-- `Ctrl+Click` on `step1` at line 21 → Should show references only to template-b step1
+- `Ctrl+Click` on `step1` at line 7 should show references only to template-a step1
+- `Ctrl+Click` on `step1` at line 21 should show references only to template-b step1
 
 This demonstrates that the extension correctly uses the `templateRef.name` to find the right WorkflowTemplate before locating the template.
 
 ### Test Case 3: Multiple Templates with Same Name
 **File**: `complex-workflow.yaml`
-- `Ctrl+Click` on `common-step` at line 21 → Should go to template-a common-step
-- `Ctrl+Click` on `common-step` at line 26 → Should go to template-b common-step
+- `Ctrl+Click` on `common-step` at line 21 should go to template-a common-step
+- `Ctrl+Click` on `common-step` at line 26 should go to template-b common-step
 
 ## How It Works
 
@@ -77,15 +77,15 @@ test-files/
 
 ## Expected Behavior
 
-✅ **Correct**: When clicking on `step1` in different `templateRef` blocks, navigate to the correct template based on the `templateRef.name`
+**Correct**: When clicking on `step1` in different `templateRef` blocks, navigate to the correct template based on the `templateRef.name`
 
-❌ **Incorrect**: Navigate to the first `step1` found, regardless of which WorkflowTemplate should be referenced
+**Incorrect**: Navigate to the first `step1` found, regardless of which WorkflowTemplate should be referenced
 
 ## Troubleshooting
 
 If the extension isn't working:
 
-1. Check that the extension is activated (you should see "Uranus YAML extension activated" message)
+1. Confirm the extension is installed and enabled in the Extension Development Host
 2. Ensure you're clicking exactly on the template name, not surrounding whitespace
 3. Verify the YAML structure is correct (proper indentation)
 4. Check VS Code's Output panel for any error messages

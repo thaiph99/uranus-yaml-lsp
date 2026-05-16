@@ -10,7 +10,7 @@
 **Usage**: Ctrl+Click on template names in `- name: templateName`
 **Files to test**: `tem1.yaml`, `multiple-templates.yaml`
 
-### 3. Find WorkflowTemplate References (from WorkflowTemplate definitions) ⭐ **NEW**
+### 3. Find WorkflowTemplate References (from WorkflowTemplate definitions) (New)
 **Usage**: Ctrl+Click on WorkflowTemplate names in `metadata.name`
 **Files to test**: `tem1.yaml`, `multiple-templates.yaml`
 
@@ -25,7 +25,7 @@
    - `composite-template.yaml` (multiple lines)
    - `simple-test.yaml`
 
-### Test Case 2: WorkflowTemplate References ⭐ **NEW**
+### Test Case 2: WorkflowTemplate References (New)
 1. Open `tem1.yaml`
 2. Ctrl+Click on `tem-tem1` in `name: tem-tem1` (line 4)
 3. **Expected**: Shows references in:
