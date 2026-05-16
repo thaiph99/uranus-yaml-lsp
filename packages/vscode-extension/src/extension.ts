@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { ArgoTemplateDefinitionProvider } from "./providers/argoTemplateDefinitionProvider";
+import { ArgoYamlDefinitionProvider } from "./providers/argoYamlDefinitionProvider";
 import { TemplateSearchService, FileSystemService, WorkspaceCacheService } from "@uranus-yaml/core";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -7,7 +7,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const workspaceCacheService = new WorkspaceCacheService();
   const fileSystemService = new FileSystemService();
   const templateSearchService = new TemplateSearchService(fileSystemService);
-  const definitionProvider = new ArgoTemplateDefinitionProvider(
+  const definitionProvider = new ArgoYamlDefinitionProvider(
     templateSearchService
   );
 
