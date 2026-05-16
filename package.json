@@ -1,7 +1,7 @@
 {
-  "name": "uranus-yaml-monorepo",
+  "name": "uranus-yaml-workspace",
   "version": "0.0.1",
-  "description": "Argo YAML template navigation for VSCode and Neovim",
+  "description": "Argo Workflow YAML navigation for VS Code and Language Server Protocol clients",
   "private": true,
   "workspaces": [
     "packages/*"
