@@ -22,8 +22,8 @@ package: build ## Package for distribution
 	npm run package:vscode
 	npm run package:lsp
 
-test: ## Run tests (placeholder)
-	@echo "Tests not implemented yet"
+test: ## Run automated tests
+	npm run test
 
 dev-lsp: build ## Start LSP server in development mode
 	cd packages/lsp-server && node dist/server.js
