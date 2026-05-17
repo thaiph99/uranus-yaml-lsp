@@ -16,7 +16,7 @@ From this repository:
 make install
 npm run build:vscode
 npm run package:vscode
-code --install-extension packages/vscode-extension/uranus-yaml-lsp-*.vsix
+code --install-extension packages/vscode-extension/uranus-yaml-*.vsix
 ```
 
 ## Usage
