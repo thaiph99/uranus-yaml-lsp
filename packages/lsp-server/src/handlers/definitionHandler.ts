@@ -13,6 +13,11 @@ import {
   WorkflowTemplateLocation
 } from '@uranus-yaml/core';
 
+type DefinitionNavigationTarget = Extract<
+  ArgoYamlNavigationTarget,
+  { readonly kind: 'templateDefinition' | 'workflowTemplateDefinition' }
+>;
+
 class LspDocumentReader implements TextDocumentReader {
   public readonly lineCount: number;
 
@@ -49,8 +54,9 @@ export class DefinitionHandler {
       return null;
     }
 
+    const documentReader = new LspDocumentReader(document);
     const target = this.navigationService.getNavigationTarget(
-      new LspDocumentReader(document),
+      documentReader,
       params.position
     );
 
@@ -58,13 +64,22 @@ export class DefinitionHandler {
       return null;
     }
 
-    
-    return this.findLocations(target);
+    if (!this.isDefinitionTarget(target)) {
+      return [this.toCurrentNameLocation(params, documentReader, target)];
+    }
+
+    return this.findDefinitionLocations(target);
   }
 
-  private async findLocations(target: ArgoYamlNavigationTarget): Promise<Location[]> {
+  private isDefinitionTarget(
+    target: ArgoYamlNavigationTarget
+  ): target is DefinitionNavigationTarget {
+    return target.kind === 'templateDefinition' || target.kind === 'workflowTemplateDefinition';
+  }
+
+  private async findDefinitionLocations(target: DefinitionNavigationTarget): Promise<Location[]> {
     try {
-      const searchResult = await this.search(target);
+      const searchResult = await this.searchDefinitions(target);
       return this.toLocations(searchResult.locations);
     } catch (error) {
       console.error("Error resolving Argo YAML definition:", error);
@@ -72,7 +87,43 @@ export class DefinitionHandler {
     }
   }
 
-  private search(target: ArgoYamlNavigationTarget): Promise<TemplateSearchResult> {
+  private toCurrentNameLocation(
+    params: DefinitionParams,
+    document: TextDocumentReader,
+    target: ArgoYamlNavigationTarget
+  ): Location {
+    const line = document.getLine(params.position.line);
+    const name = target.kind === 'templateReferences'
+      ? target.templateName
+      : target.workflowTemplateName;
+    const character = this.findNameStartCharacter(line, name) ?? params.position.character;
+    const position = { line: params.position.line, character };
+
+    return {
+      uri: params.textDocument.uri,
+      range: {
+        start: position,
+        end: position
+      }
+    };
+  }
+
+  private findNameStartCharacter(line: string, expectedValue: string): number | undefined {
+    const match = line.match(/name:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
+    if (!match || match.index === undefined || match[1] !== expectedValue) {
+      return undefined;
+    }
+
+    const colonIndex = match[0].indexOf(':');
+    const characterInMatch = match[0].indexOf(expectedValue, colonIndex + 1);
+    if (characterInMatch === -1) {
+      return undefined;
+    }
+
+    return match.index + characterInMatch;
+  }
+
+  private searchDefinitions(target: DefinitionNavigationTarget): Promise<TemplateSearchResult> {
     switch (target.kind) {
       case 'templateDefinition':
         return this.templateSearchService.findTemplateInWorkflowTemplate(
@@ -82,17 +133,6 @@ export class DefinitionHandler {
         );
       case 'workflowTemplateDefinition':
         return this.templateSearchService.findTemplateDefinition(
-          this.workspaceRoot,
-          target.workflowTemplateName
-        );
-      case 'templateReferences':
-        return this.templateSearchService.findTemplateReferences(
-          this.workspaceRoot,
-          target.workflowTemplateName,
-          target.templateName
-        );
-      case 'workflowTemplateReferences':
-        return this.templateSearchService.findWorkflowTemplateReferences(
           this.workspaceRoot,
           target.workflowTemplateName
         );
