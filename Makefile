@@ -1,4 +1,4 @@
-.PHONY: help install build clean package test
+.PHONY: help install build clean package test check-zed
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -24,6 +24,9 @@ package: build ## Package for distribution
 
 test: ## Run automated tests
 	npm run test
+
+check-zed: ## Check the Zed extension crate
+	cargo check --manifest-path packages/zed-extension/Cargo.toml --target wasm32-wasip2
 
 dev-lsp: build ## Start LSP server in development mode
 	cd packages/lsp-server && node dist/server.js

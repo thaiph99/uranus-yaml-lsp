@@ -7,6 +7,7 @@ out/
 dist/
 packages/*/dist/
 packages/*/out/
+packages/*/target/
 
 # Package files
 *.vsix
