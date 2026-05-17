@@ -110,8 +110,8 @@ export class ReferencesHandler {
     return locations.map((location) => ({
       uri: `file://${location.file}`,
       range: {
-        start: { line: location.line, character: 0 },
-        end: { line: location.line, character: Number.MAX_VALUE }
+        start: { line: location.line, character: location.character },
+        end: { line: location.line, character: location.character }
       }
     }));
   }
