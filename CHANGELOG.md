@@ -2,6 +2,19 @@
 
 All notable changes to the "uranus-yaml-lsp" extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Added a Zed editor extension that connects Zed's built-in YAML language to `uranus-yaml-lsp`.
+- Added Zed development checks and setup documentation.
+
+### Fixed
+- Fixed LSP reference requests so Neovim `gr` resolves references from definition locations consistently.
+- Fixed go-to-definition and find-references target ranges so editors jump to the matched YAML value instead of the beginning or end of the line.
+
+### Documentation
+- Documented Zed installation, local development, publishing, and troubleshooting workflows.
+
 ## [1.0.1] - 2026-05-16
 
 ### Changed

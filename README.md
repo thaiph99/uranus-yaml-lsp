@@ -1,6 +1,6 @@
 # Uranus YAML
 
-Uranus YAML is a TypeScript workspace for Argo Workflow YAML navigation. The project has one shared navigation engine and two editor adapters: a VS Code extension and a standard Language Server Protocol server for Neovim or any LSP-compatible editor.
+Uranus YAML is a TypeScript workspace for Argo Workflow YAML navigation. The project has one shared navigation engine and editor adapters for VS Code, Neovim/LSP clients, and Zed.
 
 ## Architecture
 
@@ -8,6 +8,7 @@ Uranus YAML is a TypeScript workspace for Argo Workflow YAML navigation. The pro
 packages/
 ├── core/              Shared YAML navigation engine
 ├── lsp-server/        LSP adapter and `uranus-yaml-lsp` binary
+├── zed-extension/     Zed extension that launches the LSP server
 ├── vscode-extension/  VS Code adapter and extension manifest
 └── shared-config/     Shared TypeScript compiler configuration
 ```
@@ -82,6 +83,41 @@ Use normal LSP commands in YAML buffers:
 - `gd`: go to definition.
 - `gr`: find references.
 
+## Zed usage
+
+The Zed adapter is a local Zed extension in `packages/zed-extension`. It attaches Uranus YAML to Zed's built-in YAML language and starts the existing `uranus-yaml-lsp` server.
+
+Install Rust with `rustup`, then install the Rust target that Zed uses for extensions:
+
+```bash
+rustup target add wasm32-wasip2
+```
+
+Then install the extension in Zed:
+
+1. Open Zed.
+2. Open the command palette.
+3. Run `zed: extensions`.
+4. Click **Install Dev Extension**.
+5. Select this repo's `packages/zed-extension` directory, which contains `extension.toml`.
+
+Open a workspace that contains Argo YAML files, then use Zed's normal go-to-definition and find-references actions on WorkflowTemplate names or template names.
+
+Server startup behavior:
+
+1. If `uranus-yaml-lsp` is already on `PATH`, Zed runs `uranus-yaml-lsp --stdio`.
+2. Otherwise, the extension installs `@uranus-yaml/lsp-server` with npm and runs the installed server with `--stdio`.
+
+For local development against this checkout, install the local server globally before opening Zed:
+
+```bash
+make install
+make build
+make install-lsp
+```
+
+That makes Zed use your locally built `uranus-yaml-lsp` binary instead of downloading the npm package.
+
 ## YAML example
 
 Reference:
@@ -135,6 +171,12 @@ npm run package:lsp
 npm run package:vscode
 ```
 
+Zed extension development:
+
+```bash
+cargo check --manifest-path packages/zed-extension/Cargo.toml --target wasm32-wasip2
+```
+
 ## Manual verification
 
 Use fixtures in `packages/core/test-files` after running `make build`.
@@ -153,6 +195,14 @@ Neovim:
 3. Use `gd` on `tem-tem1` and `step1`.
 4. Use `gr` from template definitions to confirm references are listed.
 
+Zed:
+
+1. Run `rustup target add wasm32-wasip2` once.
+2. Install `packages/zed-extension` with **Install Dev Extension** in Zed.
+3. Open `packages/core/test-files` in Zed.
+4. Use go-to-definition on `tem-tem1` and `step1`.
+5. Use find-references from template definitions to confirm references are listed.
+
 ## Troubleshooting
 
 - Confirm files use `.yaml` or `.yml` extensions.
@@ -160,6 +210,7 @@ Neovim:
 - Place the cursor directly on the template or WorkflowTemplate name.
 - In VS Code, inspect Developer Tools for extension errors.
 - In Neovim, use `:LspInfo` and `:LspLog` to inspect LSP status.
+- In Zed, confirm the dev extension is installed and `@uranus-yaml/lsp-server` can be installed by npm if `uranus-yaml-lsp` is not on `PATH`.
 
 ## License
 
