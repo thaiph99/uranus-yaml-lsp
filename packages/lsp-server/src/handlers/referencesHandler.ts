@@ -5,6 +5,7 @@ import {
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
+  ArgoYamlNavigationTarget,
   ArgoYamlNavigationService,
   TemplateSearchService,
   TextDocumentReader,
@@ -47,29 +48,30 @@ export class ReferencesHandler {
       return [];
     }
 
-    const reader = new LspDocumentReader(document);
-    const templateContext = this.navigationService.getTemplateReferenceContext(
-      reader,
+    const target = this.navigationService.getNavigationTarget(
+      new LspDocumentReader(document),
       params.position
     );
 
-    if (templateContext) {
-      return this.findTemplateReferences(
-        templateContext.workflowTemplateName,
-        templateContext.templateName
-      );
-    }
-
-    const workflowTemplateName = this.navigationService.getWorkflowTemplateNameAtPosition(
-      reader,
-      params.position
-    );
-
-    if (!workflowTemplateName) {
+    if (!target) {
       return [];
     }
 
-    return this.findWorkflowTemplateReferences(workflowTemplateName);
+    return this.findReferences(target);
+  }
+
+  private findReferences(target: ArgoYamlNavigationTarget): Promise<Location[]> {
+    switch (target.kind) {
+      case 'templateDefinition':
+      case 'templateReferences':
+        return this.findTemplateReferences(
+          target.workflowTemplateName,
+          target.templateName
+        );
+      case 'workflowTemplateDefinition':
+      case 'workflowTemplateReferences':
+        return this.findWorkflowTemplateReferences(target.workflowTemplateName);
+    }
   }
 
   private async findTemplateReferences(
