@@ -1,0 +1,11 @@
+id = "uranus-yaml"
+name = "Uranus YAML"
+description = "Argo Workflow YAML navigation for WorkflowTemplate definitions and references."
+version = "0.0.1"
+schema_version = 1
+authors = ["Thai Pham <thaiph99@gmail.com>"]
+repository = "https://github.com/thaiph99/uranus-yaml-lsp"
+
+[language_servers.uranus-yaml-lsp]
+name = "Uranus YAML LSP"
+languages = ["YAML"]
