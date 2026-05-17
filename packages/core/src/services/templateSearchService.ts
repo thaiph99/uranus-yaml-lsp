@@ -263,6 +263,7 @@ export class TemplateSearchService {
         locations.push({
           file: filePath,
           line: nameLineIndex,
+          ...this.getNameValueRange(lines[nameLineIndex], templateName),
         });
       }
     }
@@ -302,6 +303,7 @@ export class TemplateSearchService {
       locations.push({
         file: filePath,
         line: templateLocation,
+        ...this.getNameValueRange(lines[templateLocation], templateName),
       });
     }
 
@@ -329,6 +331,8 @@ export class TemplateSearchService {
             locations.push({
               file: filePath,
               line: refBlock.templateLine,
+              character: refBlock.templateCharacter,
+              endCharacter: refBlock.templateEndCharacter,
             });
           }
         }
@@ -358,6 +362,7 @@ export class TemplateSearchService {
             locations.push({
               file: filePath,
               line: nameLineIndex,
+              ...this.getNameValueRange(lines[nameLineIndex], workflowTemplateName),
             });
           }
         }
@@ -372,6 +377,7 @@ export class TemplateSearchService {
               locations.push({
                 file: filePath,
                 line: j,
+                ...this.getNameValueRange(nameCandidate, workflowTemplateName),
               });
               break;
             }
@@ -404,10 +410,18 @@ export class TemplateSearchService {
   private parseTemplateRefBlock(
     lines: string[],
     startIndex: number
-  ): { workflowTemplateName: string | null; templateName: string | null; templateLine: number } {
+  ): {
+    workflowTemplateName: string | null;
+    templateName: string | null;
+    templateLine: number;
+    templateCharacter: number;
+    templateEndCharacter: number;
+  } {
     let workflowTemplateName: string | null = null;
     let templateName: string | null = null;
     let templateLine = -1;
+    let templateCharacter = 0;
+    let templateEndCharacter = 0;
 
     for (let i = startIndex; i < Math.min(lines.length, startIndex + 10); i++) {
       const line = lines[i];
@@ -428,11 +442,48 @@ export class TemplateSearchService {
         if (templateMatch) {
           templateName = templateMatch[1];
           templateLine = i;
+          const templateRange = this.getTemplateValueRange(line, templateName);
+          templateCharacter = templateRange.character;
+          templateEndCharacter = templateRange.endCharacter;
         }
       }
     }
 
-    return { workflowTemplateName, templateName, templateLine };
+    return {
+      workflowTemplateName,
+      templateName,
+      templateLine,
+      templateCharacter,
+      templateEndCharacter
+    };
+  }
+
+  private getNameValueRange(line: string, expectedValue: string): { character: number; endCharacter: number } {
+    return this.getKeyValueRange(line, "name", expectedValue);
+  }
+
+  private getTemplateValueRange(line: string, expectedValue: string): { character: number; endCharacter: number } {
+    return this.getKeyValueRange(line, "template", expectedValue);
+  }
+
+  private getKeyValueRange(
+    line: string,
+    key: "name" | "template",
+    expectedValue: string
+  ): { character: number; endCharacter: number } {
+    const match = line.match(new RegExp(`${key}:\\s*['"]?([^'"#\\s]+)['"]?\\s*(?:#.*)?$`));
+    if (!match || match.index === undefined || match[1] !== expectedValue) {
+      return { character: 0, endCharacter: line.length };
+    }
+
+    const colonIndex = match[0].indexOf(":");
+    const characterInMatch = match[0].indexOf(expectedValue, colonIndex + 1);
+    if (characterInMatch === -1) {
+      return { character: 0, endCharacter: line.length };
+    }
+
+    const character = match.index + characterInMatch;
+    return { character, endCharacter: character + expectedValue.length };
   }
 
   private cleanupCache(): void {
