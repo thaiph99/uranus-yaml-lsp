@@ -109,7 +109,7 @@ export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider {
       (location) =>
         new vscode.Location(
           vscode.Uri.file(location.file),
-          new vscode.Position(location.line, 0)
+          new vscode.Position(location.line, location.character)
         )
     );
   }
