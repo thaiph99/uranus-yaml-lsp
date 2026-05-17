@@ -2,7 +2,7 @@
 
 All notable changes to the "uranus-yaml-lsp" extension will be documented in this file.
 
-## [Unreleased]
+## [1.0.2] - 2026-05-17
 
 ### Added
 - Added a Zed editor extension that connects Zed's built-in YAML language to `uranus-yaml-lsp`.
