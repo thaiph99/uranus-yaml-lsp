@@ -10,7 +10,7 @@
     "build": "npm run build --workspaces",
     "clean": "npm run clean --workspaces",
     "watch": "npm run watch --workspaces",
-    "test": "npm run build:core && npm run test -w packages/core",
+    "test": "npm run build:core && npm run build:lsp && npm run test -w packages/core && npm run test -w packages/lsp-server",
     "build:core": "npm run build -w packages/core",
     "build:lsp": "npm run build -w packages/lsp-server",
     "build:vscode": "npm run build -w packages/vscode-extension",
