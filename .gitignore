@@ -8,6 +8,7 @@ dist/
 packages/*/dist/
 packages/*/out/
 packages/*/target/
+*.tsbuildinfo
 
 # Package files
 *.vsix
