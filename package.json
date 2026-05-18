@@ -15,8 +15,8 @@
     "build:lsp": "npm run build -w packages/lsp-server",
     "build:vscode": "npm run build -w packages/vscode-extension",
     "install:all": "npm install && npm install --workspaces",
-    "package:vscode": "cd packages/vscode-extension && vsce package",
-    "package:lsp": "cd packages/lsp-server && npm pack"
+    "package:vscode": "npm run package -w packages/vscode-extension",
+    "package:lsp": "npm pack -w packages/lsp-server"
   },
   "devDependencies": {
     "rimraf": "^5.0.0"
