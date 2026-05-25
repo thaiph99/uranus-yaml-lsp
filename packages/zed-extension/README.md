@@ -56,8 +56,11 @@ Stop it with Ctrl+C after it starts.
 3. Use Zed's go-to-definition action on:
    - `templateRef.template` to jump to the template definition.
    - `templateRef.name` or `workflowTemplateRef.name` to jump to the WorkflowTemplate definition.
+   - local `template`, `entrypoint`, `onExit`, and DAG dependency values to jump to their declarations.
+   - `clusterScope: true` references to select `ClusterWorkflowTemplate` resources.
 4. Use Zed's find-references action on:
    - template definitions under `spec.templates`.
+   - DAG task names referenced from `dependencies` or `depends`.
    - WorkflowTemplate `metadata.name` values.
 
 ## Development check

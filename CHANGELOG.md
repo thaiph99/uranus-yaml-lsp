@@ -2,6 +2,14 @@
 
 All notable changes to the "uranus-yaml-lsp" extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Added go-to-definition and find-references navigation for local template calls through `entrypoint`, `onExit`, `template`, hooks, and DAG tasks.
+- Added DAG task navigation for `dependencies` lists and enhanced `depends` expressions.
+- Added `ClusterWorkflowTemplate` lookup support when `clusterScope: true` is set on `templateRef` or `workflowTemplateRef`.
+- Registered the VS Code reference provider so Find All References uses the shared navigation engine.
+
 ## [1.0.2] - 2026-05-17
 
 ### Added

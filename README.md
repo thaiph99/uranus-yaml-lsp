@@ -19,7 +19,9 @@ The core package owns workspace scanning, template search, caching, and cursor-c
 
 - Go from `templateRef.template` to the matching template definition.
 - Go from `templateRef.name` or `workflowTemplateRef.name` to the WorkflowTemplate definition.
-- Find references from template definitions and WorkflowTemplate names.
+- Go between inline `template`, `entrypoint`, `onExit`, DAG `dependencies`, and enhanced `depends` calls and their definitions/references.
+- Distinguish `WorkflowTemplate` and `ClusterWorkflowTemplate` calls through `clusterScope: true`.
+- Find references from template definitions, DAG task names, and WorkflowTemplate names.
 - Resolve same-named templates through the surrounding WorkflowTemplate context.
 - Share the same behavior between VS Code and LSP clients.
 
@@ -40,7 +42,7 @@ npm run package:vscode
 code --install-extension packages/vscode-extension/uranus-yaml-*.vsix
 ```
 
-Open a workspace that contains Argo YAML files, then Ctrl+Click a WorkflowTemplate name or template name. VS Code uses the extension's definition provider to jump to definitions or show references.
+Open a workspace that contains Argo YAML files, then use Go to Definition (`F12`) on a call or Find All References (`Shift+F12`) on a definition.
 
 ## Neovim usage
 
@@ -185,8 +187,9 @@ VS Code:
 
 1. Press F5 to launch the Extension Development Host.
 2. Open a fixture YAML file.
-3. Ctrl+Click `tem-tem1` and `step1`.
-4. Confirm definitions resolve to `tem1.yaml` and references include `workflow-with-workflowtemplate-ref.yaml`.
+3. Use `F12` on local `template`, cross-resource `templateRef`, `workflowTemplateRef`, and DAG `depends` values.
+4. Use `Shift+F12` on template and DAG task definitions.
+5. Confirm `clusterScope: true` calls in `argo-call-methods.yaml` resolve only to the `ClusterWorkflowTemplate` document.
 
 Neovim:
 

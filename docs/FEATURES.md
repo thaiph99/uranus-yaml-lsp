@@ -21,13 +21,13 @@ templateRef:
   template: step1  # Click here to go to tem1.yaml line 7
 ```
 
-### 2. Find All References (Ctrl+Click in definition files)
+### 2. Find All References (Shift+F12 in definition files)
 
 **When**: Clicking on template names in WorkflowTemplate files
 **What**: Show all places where this template is referenced
 
 ```yaml
-# In tem1.yaml - Ctrl+Click on "step1" here:
+# In tem1.yaml - Shift+F12 on "step1" here:
 spec:
   templates:
     - name: step1  # Click here to show all references
@@ -44,7 +44,7 @@ spec:
 
 ### Scenario 2: "Where is this template used?"
 1. Open `tem1.yaml`
-2. Ctrl+Click on `step1` in `- name: step1`
+2. Press Shift+F12 on `step1` in `- name: step1`
 3. Shows references panel with all usages:
    - `workflow.yaml` line 13
    - `cronworkflow.yaml` line 13
@@ -54,6 +54,15 @@ spec:
 1. Multiple WorkflowTemplates have `step1` templates
 2. Extension correctly uses `templateRef.name` to find the right one
 3. References are grouped by WorkflowTemplate name
+
+### Scenario 4: "Use local calls and DAG dependencies"
+1. Use Go to Definition on `entrypoint`, `onExit`, local `template`, `dependencies`, or `depends`
+2. Navigation resolves the local template or DAG task declaration in the same Argo resource
+3. Find All References on that declaration returns its callers or dependent tasks
+
+### Scenario 5: "Select cluster-scoped reusable templates"
+1. Set `clusterScope: true` in `templateRef` or `workflowTemplateRef`
+2. Go to Definition resolves `ClusterWorkflowTemplate`, not a same-named `WorkflowTemplate`
 
 ## Files for Testing
 

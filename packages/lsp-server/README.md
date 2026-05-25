@@ -66,7 +66,10 @@ Open an Argo Workflow YAML file and use normal LSP commands:
 
 - `gd` on `templateRef.template`: jump to the template definition.
 - `gd` on `templateRef.name` or `workflowTemplateRef.name`: jump to the WorkflowTemplate definition.
+- `gd` on local `template`, `entrypoint`, `onExit`, or DAG dependency values: jump to local template or DAG task definitions.
+- `clusterScope: true` calls resolve against `ClusterWorkflowTemplate` resources.
 - `gr` on a template definition: list template references.
+- `gr` on a DAG task declaration: list `dependencies` and `depends` references.
 - `gr` on a WorkflowTemplate name: list WorkflowTemplate references.
 
 ## Development
