@@ -8,6 +8,20 @@ interface CachedFileContent {
 
 type ReusableTemplateKind = "WorkflowTemplate" | "ClusterWorkflowTemplate";
 type ContentSearch = (content: string, filePath: string) => WorkflowTemplateLocation[];
+type NavigationKey = "name" | "template" | "entrypoint" | "onExit";
+
+interface ValueLocation {
+  readonly value: string;
+  readonly line: number;
+  readonly character: number;
+  readonly endCharacter: number;
+}
+
+interface ReusableTemplateReference {
+  readonly name: ValueLocation | undefined;
+  readonly template: ValueLocation | undefined;
+  readonly clusterScope: boolean;
+}
 
 export class TemplateSearchService {
   private readonly fileCache = new Map<string, CachedFileContent>();
@@ -332,19 +346,12 @@ export class TemplateSearchService {
       const line = lines[i];
 
       if (line.includes("templateRef:")) {
-        const refBlock = this.parseTemplateRefBlock(lines, i);
+        const ref = this.parseReusableTemplateReference(lines, i);
 
-        if (refBlock.workflowTemplateName === workflowTemplateName &&
-            refBlock.templateName === templateName &&
-            refBlock.clusterScope === clusterScope) {
-          if (refBlock.templateLine !== -1) {
-            locations.push({
-              file: filePath,
-              line: refBlock.templateLine,
-              character: refBlock.templateCharacter,
-              endCharacter: refBlock.templateEndCharacter,
-            });
-          }
+        if (ref.name?.value === workflowTemplateName &&
+            ref.template?.value === templateName &&
+            ref.clusterScope === clusterScope) {
+          locations.push({ file: filePath, ...ref.template });
         }
       }
     }
@@ -365,31 +372,19 @@ export class TemplateSearchService {
       const line = lines[i];
 
       if (line.includes("templateRef:")) {
-        const refBlock = this.parseTemplateRefBlock(lines, i);
+        const ref = this.parseReusableTemplateReference(lines, i);
 
-        if (refBlock.workflowTemplateName === workflowTemplateName &&
-            refBlock.clusterScope === clusterScope) {
-          const nameLineIndex = this.findWorkflowTemplateNameLineInTemplateRef(lines, i);
-          if (nameLineIndex !== -1) {
-            locations.push({
-              file: filePath,
-              line: nameLineIndex,
-              ...this.getNameValueRange(lines[nameLineIndex], workflowTemplateName),
-            });
-          }
+        if (ref.name?.value === workflowTemplateName &&
+            ref.clusterScope === clusterScope) {
+          locations.push({ file: filePath, ...ref.name });
         }
       }
 
       if (line.includes("workflowTemplateRef:")) {
-        const refBlock = this.parseWorkflowTemplateRefBlock(lines, i);
-        if (refBlock.workflowTemplateName === workflowTemplateName &&
-            refBlock.clusterScope === clusterScope &&
-            refBlock.nameLine !== -1) {
-          locations.push({
-            file: filePath,
-            line: refBlock.nameLine,
-            ...this.getNameValueRange(lines[refBlock.nameLine], workflowTemplateName),
-          });
+        const ref = this.parseReusableTemplateReference(lines, i);
+        if (ref.name?.value === workflowTemplateName &&
+            ref.clusterScope === clusterScope) {
+          locations.push({ file: filePath, ...ref.name });
         }
       }
     }
@@ -512,44 +507,12 @@ export class TemplateSearchService {
     return locations;
   }
 
-  private findWorkflowTemplateNameLineInTemplateRef(
+  private parseReusableTemplateReference(
     lines: string[],
     startIndex: number
-  ): number {
-    const blockIndent = this.getIndent(lines[startIndex]);
-    for (let i = startIndex + 1; i < lines.length; i++) {
-      const line = lines[i];
-
-      if (line.trim() === "" || /^\s*#/.test(line)) {
-        continue;
-      }
-      if (this.getIndent(line) <= blockIndent) {
-        break;
-      }
-
-      if (/^\s*name:\s*/.test(line)) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  private parseTemplateRefBlock(
-    lines: string[],
-    startIndex: number
-  ): {
-    workflowTemplateName: string | null;
-    templateName: string | null;
-    templateLine: number;
-    templateCharacter: number;
-    templateEndCharacter: number;
-    clusterScope: boolean;
-  } {
-    let workflowTemplateName: string | null = null;
-    let templateName: string | null = null;
-    let templateLine = -1;
-    let templateCharacter = 0;
-    let templateEndCharacter = 0;
+  ): ReusableTemplateReference {
+    let name: ValueLocation | undefined;
+    let template: ValueLocation | undefined;
     let clusterScope = false;
     const blockIndent = this.getIndent(lines[startIndex]);
 
@@ -563,22 +526,14 @@ export class TemplateSearchService {
         break;
       }
 
-      if (/^\s*name:\s*/.test(line) && workflowTemplateName === null) {
-        const nameMatch = line.match(/name:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
-        if (nameMatch) {
-          workflowTemplateName = nameMatch[1];
-        }
+      const nameValue = this.extractKeyValue(line, "name");
+      if (nameValue && !name) {
+        name = { value: nameValue, line: i, ...this.getKeyValueRange(line, "name", nameValue) };
       }
 
-      if (/^\s*template:\s*/.test(line)) {
-        const templateMatch = line.match(/template:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
-        if (templateMatch) {
-          templateName = templateMatch[1];
-          templateLine = i;
-          const templateRange = this.getTemplateValueRange(line, templateName);
-          templateCharacter = templateRange.character;
-          templateEndCharacter = templateRange.endCharacter;
-        }
+      const templateValue = this.extractKeyValue(line, "template");
+      if (templateValue) {
+        template = { value: templateValue, line: i, ...this.getKeyValueRange(line, "template", templateValue) };
       }
 
       if (/^\s*clusterScope:\s*true\s*(?:#.*)?$/.test(line)) {
@@ -586,58 +541,16 @@ export class TemplateSearchService {
       }
     }
 
-    return {
-      workflowTemplateName,
-      templateName,
-      templateLine,
-      templateCharacter,
-      templateEndCharacter,
-      clusterScope
-    };
-  }
-
-  private parseWorkflowTemplateRefBlock(
-    lines: string[],
-    startIndex: number
-  ): { workflowTemplateName: string | null; nameLine: number; clusterScope: boolean } {
-    const blockIndent = this.getIndent(lines[startIndex]);
-    let workflowTemplateName: string | null = null;
-    let nameLine = -1;
-    let clusterScope = false;
-
-    for (let i = startIndex + 1; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.trim() === "" || /^\s*#/.test(line)) {
-        continue;
-      }
-      if (this.getIndent(line) <= blockIndent) {
-        break;
-      }
-
-      const nameMatch = line.match(/^\s*name:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
-      if (nameMatch) {
-        workflowTemplateName = nameMatch[1];
-        nameLine = i;
-      }
-      if (/^\s*clusterScope:\s*true\s*(?:#.*)?$/.test(line)) {
-        clusterScope = true;
-      }
-    }
-
-    return { workflowTemplateName, nameLine, clusterScope };
+    return { name, template, clusterScope };
   }
 
   private getNameValueRange(line: string, expectedValue: string): { character: number; endCharacter: number } {
     return this.getKeyValueRange(line, "name", expectedValue);
   }
 
-  private getTemplateValueRange(line: string, expectedValue: string): { character: number; endCharacter: number } {
-    return this.getKeyValueRange(line, "template", expectedValue);
-  }
-
   private getKeyValueRange(
     line: string,
-    key: "name" | "template" | "entrypoint" | "onExit",
+    key: NavigationKey,
     expectedValue: string
   ): { character: number; endCharacter: number } {
     const match = line.match(new RegExp(`${key}:\\s*['"]?([^'"#\\s]+)['"]?\\s*(?:#.*)?$`));
@@ -1128,7 +1041,7 @@ export class TemplateSearchService {
     return nameMatch?.[1] === resourceName;
   }
 
-  private extractKeyValue(line: string, key: "template" | "entrypoint" | "onExit"): string | undefined {
+  private extractKeyValue(line: string, key: NavigationKey): string | undefined {
     const match = line.match(new RegExp(`${key}:\\s*['"]?([^'"#\\s]+)['"]?\\s*(?:#.*)?$`));
     return match?.[1];
   }
