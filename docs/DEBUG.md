@@ -1,73 +1,25 @@
-# Debug Guide for Ctrl+Click Navigation
+# Debugging Navigation
 
-## How Ctrl+Click Works Now
+Navigation has two stages:
 
-The extension now uses **Ctrl+Click** for smart navigation based on context:
+1. `ArgoYamlNavigationService` classifies the YAML value under the cursor as a definition search or a reference search target.
+2. Shared target-search routing calls `TemplateSearchService`, which scans cached YAML content and returns value ranges.
 
-### Context 1: Template Reference to Go to Definition
-**When**: Ctrl+Click on template references in usage files
-**Action**: Navigate to template definition
+VS Code and the LSP server are adapters: they convert editor documents and positions to core inputs and convert core locations back to editor locations.
 
-```yaml
-# In workflow.yaml - Ctrl+Click on "step1":
-templateRef:
-  name: tem-tem1
-  template: step1  # Ctrl+Click here goes to definition
-```
+## Commands
 
-### Context 2: Template Definition to Find All References
-**When**: Ctrl+Click on template names in WorkflowTemplate definition files
-**Action**: Show all references to this template
+- Use Go to Definition (`F12`, Ctrl+Click in VS Code, or `gd` in Neovim) on a call value.
+- Use Find All References (`Shift+F12` in VS Code or `gr` in Neovim) on a declaration.
 
-```yaml
-# In tem1.yaml - Ctrl+Click on "step1":
-spec:
-  templates:
-    - name: step1  # Ctrl+Click here shows all references
-      container:
-        image: alpine
-```
+Do not use Ctrl+Click as a reference-search test: VS Code invokes its definition provider for Ctrl+Click.
 
-### Context 3: WorkflowTemplate Name Definition to Find All References
-**When**: Ctrl+Click on WorkflowTemplate names in metadata section
-**Action**: Show all references to this WorkflowTemplate
+## Diagnosis Checklist
 
-```yaml
-# In tem1.yaml - Ctrl+Click on "tem-tem1":
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
-metadata:
-  name: tem-tem1  # Ctrl+Click here shows all WorkflowTemplate references
-spec:
-  templates:
-    - name: step1
-```
+1. Reproduce the issue in one of the fixtures under `packages/core/test-files`.
+2. Determine whether the cursor should resolve a local template, reusable template, DAG task, or reusable-template resource.
+3. Add or adjust a core navigation test if the target kind is wrong.
+4. Add or adjust a core search test if the target is correct but its locations are wrong.
+5. Add an LSP handler test only when protocol conversion or target routing is at fault.
 
-## Testing Steps
-
-1. **Launch Extension Development Host**:
-   ```
-   Press F5 in VS Code
-   ```
-
-2. **Test Go to Definition**:
-   - Open `workflow.yaml`
-   - Ctrl+Click on `step1` in `template: step1`
-   - Should navigate to `tem1.yaml`
-
-3. **Test Find Template References**:
-   - Open `tem1.yaml`
-   - Ctrl+Click on `step1` in `- name: step1`
-   - Should show references panel with template usage
-
-4. **Test Find WorkflowTemplate References**:
-   - Open `tem1.yaml`
-   - Ctrl+Click on `tem-tem1` in `name: tem-tem1`
-   - Should show references panel with WorkflowTemplate usage
-
-## Expected Results
-
-- **From `workflow.yaml`**: Ctrl+Click navigates to definition
-- **From `tem1.yaml` template names**: Ctrl+Click shows template references
-- **From `tem1.yaml` WorkflowTemplate name**: Ctrl+Click shows WorkflowTemplate references
-- **Smart Context Detection**: Extension automatically detects what you're clicking on
+For manual reproduction steps, see [TESTING.md](TESTING.md).
