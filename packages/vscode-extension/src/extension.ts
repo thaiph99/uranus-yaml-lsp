@@ -16,10 +16,15 @@ export function activate(context: vscode.ExtensionContext): void {
     { language: "yaml" },
     definitionProvider
   );
+  const referencesProviderDisposable = vscode.languages.registerReferenceProvider(
+    { language: "yaml" },
+    definitionProvider
+  );
 
   // Register disposables
   context.subscriptions.push(
     definitionProviderDisposable,
+    referencesProviderDisposable,
     workspaceCacheService
   );
 }

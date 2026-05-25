@@ -13,4 +13,5 @@ export interface TemplateSearchResult {
 export interface TemplateRefContext {
   readonly workflowTemplateName: string;
   readonly templateName: string;
+  readonly clusterScope?: true;
 }

@@ -16,19 +16,45 @@ export type ArgoYamlNavigationTarget =
       readonly kind: "templateReferences";
       readonly workflowTemplateName: string;
       readonly templateName: string;
+      readonly clusterScope?: true;
     }
   | {
       readonly kind: "workflowTemplateReferences";
       readonly workflowTemplateName: string;
+      readonly clusterScope?: true;
     }
   | {
       readonly kind: "templateDefinition";
       readonly workflowTemplateName: string;
       readonly templateName: string;
+      readonly clusterScope?: true;
+    }
+  | {
+      readonly kind: "localTemplateDefinition";
+      readonly resourceName: string;
+      readonly templateName: string;
+    }
+  | {
+      readonly kind: "localTemplateReferences";
+      readonly resourceName: string;
+      readonly templateName: string;
+    }
+  | {
+      readonly kind: "dagTaskDefinition";
+      readonly resourceName: string;
+      readonly templateName: string;
+      readonly taskName: string;
+    }
+  | {
+      readonly kind: "dagTaskReferences";
+      readonly resourceName: string;
+      readonly templateName: string;
+      readonly taskName: string;
     }
   | {
       readonly kind: "workflowTemplateDefinition";
       readonly workflowTemplateName: string;
+      readonly clusterScope?: true;
     };
 
 export interface TemplateReferenceContext {
@@ -46,11 +72,40 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
+    const dagDependencyReference = this.getDagDependencyReferenceContext(document, position);
+    if (dagDependencyReference) {
+      return {
+        kind: "dagTaskDefinition",
+        resourceName: dagDependencyReference.resourceName,
+        templateName: dagDependencyReference.templateName,
+        taskName: dagDependencyReference.taskName
+      };
+    }
+
+    const dagTaskDefinition = this.getDagTaskDefinitionContext(document, position);
+    if (dagTaskDefinition) {
+      return {
+        kind: "dagTaskReferences",
+        resourceName: dagTaskDefinition.resourceName,
+        templateName: dagTaskDefinition.templateName,
+        taskName: dagTaskDefinition.taskName
+      };
+    }
+
     const templateDefinition = this.getTemplateDefinitionContext(document, position);
     if (templateDefinition) {
+      if (this.isReusableTemplateResource(document, position)) {
+        return {
+          kind: "templateReferences",
+          workflowTemplateName: templateDefinition.workflowTemplateName,
+          templateName: templateDefinition.templateName,
+          ...(this.isClusterWorkflowTemplateResource(document, position) ? { clusterScope: true } : {})
+        };
+      }
+
       return {
-        kind: "templateReferences",
-        workflowTemplateName: templateDefinition.workflowTemplateName,
+        kind: "localTemplateReferences",
+        resourceName: templateDefinition.workflowTemplateName,
         templateName: templateDefinition.templateName
       };
     }
@@ -59,7 +114,8 @@ export class ArgoYamlNavigationService {
     if (workflowTemplateDefinition) {
       return {
         kind: "workflowTemplateReferences",
-        workflowTemplateName: workflowTemplateDefinition
+        workflowTemplateName: workflowTemplateDefinition.workflowTemplateName,
+        ...(workflowTemplateDefinition.clusterScope ? { clusterScope: true } : {})
       };
     }
 
@@ -68,7 +124,8 @@ export class ArgoYamlNavigationService {
       return {
         kind: "templateDefinition",
         workflowTemplateName: templateRefContext.workflowTemplateName,
-        templateName: templateRefContext.templateName
+        templateName: templateRefContext.templateName,
+        ...(templateRefContext.clusterScope ? { clusterScope: true } : {})
       };
     }
 
@@ -76,19 +133,21 @@ export class ArgoYamlNavigationService {
     if (workflowTemplateRef) {
       return {
         kind: "workflowTemplateDefinition",
-        workflowTemplateName: workflowTemplateRef
+        workflowTemplateName: workflowTemplateRef.workflowTemplateName,
+        ...(workflowTemplateRef.clusterScope ? { clusterScope: true } : {})
       };
     }
 
-    const templateName = this.getNameAtPosition(document, position);
-    if (!templateName || templateName.length < 2) {
-      return undefined;
+    const localTemplateCall = this.getLocalTemplateCallContext(document, position);
+    if (localTemplateCall) {
+      return {
+        kind: "localTemplateDefinition",
+        resourceName: localTemplateCall.workflowTemplateName,
+        templateName: localTemplateCall.templateName
+      };
     }
 
-    return {
-      kind: "workflowTemplateDefinition",
-      workflowTemplateName: templateName
-    };
+    return undefined;
   }
 
   public getTemplateReferenceContext(
@@ -116,7 +175,241 @@ export class ArgoYamlNavigationService {
   }
 
   private isNameReference(line: string): boolean {
-    return line.includes("name:") || line.includes("template:");
+    return (
+      line.includes("name:") ||
+      line.includes("template:") ||
+      line.includes("entrypoint:") ||
+      line.includes("onExit:") ||
+      line.includes("depends:") ||
+      line.includes("dependencies:") ||
+      /^\s*-\s*[A-Za-z0-9_-]+/.test(line)
+    );
+  }
+
+  private getDagTaskDefinitionContext(
+    document: TextDocumentReader,
+    position: DocumentPosition
+  ): { resourceName: string; templateName: string; taskName: string } | undefined {
+    const currentLine = document.getLine(position.line);
+    if (!/^\s*-\s+name:\s*(.+)$/.test(currentLine)) {
+      return undefined;
+    }
+
+    const dagTasksLineIndex = this.findContainingDagTasksSection(document, position);
+    if (dagTasksLineIndex === -1) {
+      return undefined;
+    }
+
+    if (this.getIndent(currentLine) !== this.getIndent(document.getLine(dagTasksLineIndex)) + 2) {
+      return undefined;
+    }
+
+    const taskName = this.getNameAtPosition(document, position);
+    const templateName = this.getContainingTemplateName(document, position);
+    const resourceName = this.getContainingArgoResourceName(document, position);
+    if (!taskName || !templateName || !resourceName) {
+      return undefined;
+    }
+
+    return { resourceName, templateName, taskName };
+  }
+
+  private getDagDependencyReferenceContext(
+    document: TextDocumentReader,
+    position: DocumentPosition
+  ): { resourceName: string; templateName: string; taskName: string } | undefined {
+    const currentLine = document.getLine(position.line);
+    if (!this.isDagDependencyReferenceLine(document, position, currentLine)) {
+      return undefined;
+    }
+
+    const taskName = currentLine.includes("depends:")
+      ? this.extractDependsTokenAtPosition(currentLine, position.character)
+      : this.extractDependencyTokenAtPosition(currentLine, position.character);
+    if (!taskName) {
+      return undefined;
+    }
+
+    const dagTasksLineIndex = this.findContainingDagTasksSection(document, position);
+    if (dagTasksLineIndex === -1) {
+      return undefined;
+    }
+
+    const templateName = this.getContainingTemplateName(document, position);
+    const resourceName = this.getContainingArgoResourceName(document, position);
+    if (!templateName || !resourceName) {
+      return undefined;
+    }
+
+    return { resourceName, templateName, taskName };
+  }
+
+  private isDagDependencyReferenceLine(
+    document: TextDocumentReader,
+    position: DocumentPosition,
+    line: string
+  ): boolean {
+    if (/^\s*depends:\s*/.test(line) || /^\s*dependencies:\s*/.test(line)) {
+      return true;
+    }
+
+    if (!/^\s*-\s*[A-Za-z0-9_-]+/.test(line)) {
+      return false;
+    }
+
+    const listIndent = this.getIndent(line);
+    for (let lineIndex = position.line - 1; lineIndex >= 0; lineIndex--) {
+      const candidateLine = document.getLine(lineIndex);
+      if (candidateLine.trim().length === 0) {
+        continue;
+      }
+
+      const candidateIndent = this.getIndent(candidateLine);
+      if (candidateIndent >= listIndent) {
+        continue;
+      }
+
+      return /^\s*dependencies:\s*(?:#.*)?$/.test(candidateLine);
+    }
+
+    return false;
+  }
+
+  private findContainingDagTasksSection(
+    document: TextDocumentReader,
+    position: DocumentPosition
+  ): number {
+    const positionIndent = this.getIndent(document.getLine(position.line));
+
+    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
+      const line = document.getLine(lineIndex);
+      if (!/^\s*tasks:\s*(?:#.*)?$/.test(line)) {
+        continue;
+      }
+
+      const tasksIndent = this.getIndent(line);
+      if (position.line !== lineIndex && positionIndent <= tasksIndent) {
+        continue;
+      }
+
+      if (this.hasSectionBoundaryBetween(document, lineIndex, position.line, tasksIndent)) {
+        continue;
+      }
+
+      if (this.isDagTasksSection(document, lineIndex)) {
+        return lineIndex;
+      }
+    }
+
+    return -1;
+  }
+
+  private hasSectionBoundaryBetween(
+    document: TextDocumentReader,
+    startLine: number,
+    endLine: number,
+    sectionIndent: number
+  ): boolean {
+    for (let lineIndex = startLine + 1; lineIndex < endLine; lineIndex++) {
+      const line = document.getLine(lineIndex);
+      if (line.trim().length === 0 || /^\s*#/.test(line)) {
+        continue;
+      }
+
+      if (this.getIndent(line) <= sectionIndent) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private isDagTasksSection(document: TextDocumentReader, tasksLineIndex: number): boolean {
+    const tasksIndent = this.getIndent(document.getLine(tasksLineIndex));
+
+    for (let lineIndex = tasksLineIndex - 1; lineIndex >= 0; lineIndex--) {
+      const line = document.getLine(lineIndex);
+      if (line.trim().length === 0) {
+        continue;
+      }
+
+      const indent = this.getIndent(line);
+      if (indent >= tasksIndent) {
+        continue;
+      }
+
+      return /^\s*dag:\s*(?:#.*)?$/.test(line);
+    }
+
+    return false;
+  }
+
+  private getContainingTemplateName(
+    document: TextDocumentReader,
+    position: DocumentPosition
+  ): string | undefined {
+    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
+      const line = document.getLine(lineIndex);
+      if (lineIndex < position.line && this.isArgoResourceKindLine(line)) {
+        return undefined;
+      }
+      if (!/^\s*-\s+name:\s*(.+)$/.test(line)) {
+        continue;
+      }
+
+      if (this.isDirectTemplateDefinition(document, { line: lineIndex, character: line.indexOf("name:") + 6 })) {
+        return this.extractNameValue(line);
+      }
+    }
+
+    return undefined;
+  }
+
+  private extractDependencyTokenAtPosition(line: string, character: number): string | undefined {
+    const tokenRanges = this.getTokenRanges(line, /[A-Za-z0-9_-]+/g);
+    const filteredRanges = line.includes("dependencies:")
+      ? tokenRanges.filter((range) => range.value !== "dependencies")
+      : tokenRanges;
+
+    return this.findTokenAtPosition(filteredRanges, character);
+  }
+
+  private extractDependsTokenAtPosition(line: string, character: number): string | undefined {
+    const tokenRanges = this.getTokenRanges(line, /[A-Za-z0-9_-]+(?:\.[A-Za-z]+)?/g)
+      .filter((range) => range.value !== "depends")
+      .map((range) => {
+        const taskName = range.value.match(/^([A-Za-z0-9_-]+)/)?.[1];
+        return {
+          start: range.start,
+          end: range.start + (taskName?.length ?? range.value.length),
+          value: taskName ?? range.value
+        };
+      });
+
+    return this.findTokenAtPosition(tokenRanges, character);
+  }
+
+  private getTokenRanges(
+    line: string,
+    pattern: RegExp
+  ): Array<{ start: number; end: number; value: string }> {
+    const ranges: Array<{ start: number; end: number; value: string }> = [];
+    for (const match of line.matchAll(pattern)) {
+      if (match.index === undefined) {
+        continue;
+      }
+
+      ranges.push({ start: match.index, end: match.index + match[0].length, value: match[0] });
+    }
+
+    return ranges;
+  }
+
+  private findTokenAtPosition(
+    tokenRanges: Array<{ start: number; end: number; value: string }>,
+    character: number
+  ): string | undefined {
+    return tokenRanges.find((range) => character >= range.start && character < range.end)?.value;
   }
 
   private getTemplateRefContext(
@@ -138,7 +431,11 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    return { workflowTemplateName, templateName };
+    return {
+      workflowTemplateName,
+      templateName,
+      ...(this.hasClusterScopeInRefBlock(document, position, "templateRef") ? { clusterScope: true } : {})
+    };
   }
 
   private findWorkflowTemplateNameInTemplateRef(
@@ -174,7 +471,7 @@ export class ArgoYamlNavigationService {
       return wordAtPosition;
     }
 
-    if (line.includes("name:") || line.includes("template:")) {
+    if (this.hasNavigationValue(line)) {
       return this.extractNameValue(line);
     }
 
@@ -215,17 +512,25 @@ export class ArgoYamlNavigationService {
   private getWorkflowTemplateRefName(
     document: TextDocumentReader,
     position: DocumentPosition
-  ): string | undefined {
+  ): { workflowTemplateName: string; clusterScope?: true } | undefined {
     const currentLine = document.getLine(position.line);
     if (!currentLine.includes("name:") || currentLine.includes("template:")) {
       return undefined;
     }
 
-    if (!this.isInTemplateRefBlock(document, position)) {
+    if (!this.isInTemplateRefBlock(document, position) && !this.isInWorkflowTemplateRefBlock(document, position)) {
       return undefined;
     }
 
-    return this.getNameAtPosition(document, position);
+    const workflowTemplateName = this.getNameAtPosition(document, position);
+    if (!workflowTemplateName) {
+      return undefined;
+    }
+
+    return {
+      workflowTemplateName,
+      ...(this.hasClusterScopeInRefBlock(document, position, "workflowTemplateRef") ? { clusterScope: true } : {})
+    };
   }
 
   private isInTemplateRefBlock(
@@ -247,6 +552,28 @@ export class ArgoYamlNavigationService {
     return false;
   }
 
+  private isInWorkflowTemplateRefBlock(
+    document: TextDocumentReader,
+    position: DocumentPosition
+  ): boolean {
+    const startLine = Math.max(0, position.line - 5);
+
+    for (let lineIndex = position.line; lineIndex >= startLine; lineIndex--) {
+      const line = document.getLine(lineIndex);
+      if (line.includes("workflowTemplateRef:")) {
+        return true;
+      }
+      if (line.includes("templateRef:")) {
+        return false;
+      }
+      if (line.includes("spec:") && lineIndex < position.line) {
+        return false;
+      }
+    }
+
+    return false;
+  }
+
   private getTemplateDefinitionContext(
     document: TextDocumentReader,
     position: DocumentPosition
@@ -256,12 +583,12 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    if (!this.isWithinTemplatesSection(document, position)) {
+    if (!this.isDirectTemplateDefinition(document, position)) {
       return undefined;
     }
 
     const templateName = this.getNameAtPosition(document, position);
-    const workflowTemplateName = this.getContainingWorkflowTemplateName(document, position);
+    const workflowTemplateName = this.getContainingArgoResourceName(document, position);
 
     if (!templateName || !workflowTemplateName) {
       return undefined;
@@ -270,39 +597,56 @@ export class ArgoYamlNavigationService {
     return { workflowTemplateName, templateName };
   }
 
-  private isWithinTemplatesSection(
+  private isDirectTemplateDefinition(
     document: TextDocumentReader,
     position: DocumentPosition
   ): boolean {
-    const startLine = Math.max(0, position.line - 50);
+    const templatesLineIndex = this.findContainingTemplatesSection(document, position);
+    if (templatesLineIndex === -1) {
+      return false;
+    }
 
-    for (let lineIndex = position.line; lineIndex >= startLine; lineIndex--) {
+    return this.getIndent(document.getLine(position.line)) === this.getIndent(document.getLine(templatesLineIndex)) + 2;
+  }
+
+  private findContainingTemplatesSection(
+    document: TextDocumentReader,
+    position: DocumentPosition
+  ): number {
+    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
       const line = document.getLine(lineIndex);
       if (line.includes("templates:")) {
-        return true;
+        return lineIndex;
       }
       if (line.includes("kind:") || line.includes("apiVersion:")) {
-        return false;
+        return -1;
       }
     }
 
-    return false;
+    return -1;
   }
 
   private getContainingWorkflowTemplateName(
     document: TextDocumentReader,
     position: DocumentPosition
   ): string | undefined {
+    return this.getContainingArgoResourceName(document, position);
+  }
+
+  private getContainingArgoResourceName(
+    document: TextDocumentReader,
+    position: DocumentPosition
+  ): string | undefined {
     for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
       const line = document.getLine(lineIndex);
-      if (!line.includes("kind: WorkflowTemplate")) {
+      if (!this.isArgoResourceKindLine(line)) {
         continue;
       }
 
       const endLine = Math.min(document.lineCount, lineIndex + 20);
       for (let metadataLineIndex = lineIndex + 1; metadataLineIndex < endLine; metadataLineIndex++) {
         const metadataLine = document.getLine(metadataLineIndex);
-        if (metadataLine.includes("name:")) {
+        if (metadataLine.includes("name:") || metadataLine.includes("generateName:")) {
           return this.extractNameValue(metadataLine);
         }
       }
@@ -311,16 +655,58 @@ export class ArgoYamlNavigationService {
     return undefined;
   }
 
+  private isReusableTemplateResource(
+    document: TextDocumentReader,
+    position: DocumentPosition
+  ): boolean {
+    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
+      const line = document.getLine(lineIndex);
+      if (line.includes("kind: WorkflowTemplate") || line.includes("kind: ClusterWorkflowTemplate")) {
+        return true;
+      }
+      if (this.isArgoResourceKindLine(line)) {
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  private isClusterWorkflowTemplateResource(
+    document: TextDocumentReader,
+    position: DocumentPosition
+  ): boolean {
+    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
+      const line = document.getLine(lineIndex);
+      if (line.includes("kind: ClusterWorkflowTemplate")) {
+        return true;
+      }
+      if (this.isArgoResourceKindLine(line)) {
+        return false;
+      }
+    }
+
+    return false;
+  }
+
   private getWorkflowTemplateDefinitionName(
     document: TextDocumentReader,
     position: DocumentPosition
-  ): string | undefined {
+  ): { workflowTemplateName: string; clusterScope?: true } | undefined {
     const currentLine = document.getLine(position.line);
     if (!currentLine.includes("name:") || !this.isInWorkflowTemplateMetadata(document, position)) {
       return undefined;
     }
 
-    return this.extractNameValue(currentLine);
+    const workflowTemplateName = this.extractNameValue(currentLine);
+    if (!workflowTemplateName) {
+      return undefined;
+    }
+
+    return {
+      workflowTemplateName,
+      ...(this.isClusterWorkflowTemplateResource(document, position) ? { clusterScope: true } : {})
+    };
   }
 
   private isInWorkflowTemplateMetadata(
@@ -336,7 +722,7 @@ export class ArgoYamlNavigationService {
       if (line.includes("metadata:")) {
         foundMetadata = true;
       }
-      if (line.includes("kind: WorkflowTemplate")) {
+      if (line.includes("kind: WorkflowTemplate") || line.includes("kind: ClusterWorkflowTemplate")) {
         foundWorkflowTemplate = true;
         break;
       }
@@ -349,7 +735,98 @@ export class ArgoYamlNavigationService {
   }
 
   private extractNameValue(line: string): string | undefined {
-    const nameMatch = line.match(/(?:name|template):\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
+    const nameMatch = line.match(/(?:name|generateName|template|entrypoint|onExit):\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
     return nameMatch?.[1];
+  }
+
+  private getLocalTemplateCallContext(
+    document: TextDocumentReader,
+    position: DocumentPosition
+  ): TemplateReferenceContext | undefined {
+    const currentLine = document.getLine(position.line);
+    if (!this.isLocalTemplateCallLine(document, position, currentLine)) {
+      return undefined;
+    }
+
+    const templateName = this.getNameAtPosition(document, position);
+    const workflowTemplateName = this.getContainingArgoResourceName(document, position);
+    if (!templateName || !workflowTemplateName) {
+      return undefined;
+    }
+
+    return { workflowTemplateName, templateName };
+  }
+
+  private isLocalTemplateCallLine(
+    document: TextDocumentReader,
+    position: DocumentPosition,
+    line: string
+  ): boolean {
+    if (/^\s*(entrypoint|onExit):\s*/.test(line)) {
+      return true;
+    }
+
+    if (!/^\s*template:\s*/.test(line)) {
+      return false;
+    }
+
+    return !this.isInTemplateRefBlock(document, position);
+  }
+
+  private hasNavigationValue(line: string): boolean {
+    return (
+      line.includes("name:") ||
+      line.includes("template:") ||
+      line.includes("entrypoint:") ||
+      line.includes("onExit:") ||
+      line.includes("generateName:")
+    );
+  }
+
+  private isArgoResourceKindLine(line: string): boolean {
+    return /kind:\s*(Workflow|CronWorkflow|WorkflowTemplate|ClusterWorkflowTemplate)\s*(?:#.*)?$/.test(line);
+  }
+
+  private hasClusterScopeInRefBlock(
+    document: TextDocumentReader,
+    position: DocumentPosition,
+    key: "templateRef" | "workflowTemplateRef"
+  ): boolean {
+    const startLine = Math.max(0, position.line - 10);
+    const endLine = Math.min(document.lineCount - 1, position.line + 10);
+    let blockLine = -1;
+    let blockIndent = -1;
+
+    for (let lineIndex = position.line; lineIndex >= startLine; lineIndex--) {
+      const line = document.getLine(lineIndex);
+      if (new RegExp(`^\\s*${key}:\\s*(?:#.*)?$`).test(line)) {
+        blockLine = lineIndex;
+        blockIndent = this.getIndent(line);
+        break;
+      }
+    }
+
+    if (blockLine === -1) {
+      return false;
+    }
+
+    for (let lineIndex = blockLine + 1; lineIndex <= endLine; lineIndex++) {
+      const line = document.getLine(lineIndex);
+      if (line.trim().length === 0 || /^\s*#/.test(line)) {
+        continue;
+      }
+      if (this.getIndent(line) <= blockIndent) {
+        break;
+      }
+      if (/^\s*clusterScope:\s*true\s*(?:#.*)?$/.test(line)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private getIndent(line: string): number {
+    return line.match(/^\s*/)?.[0].length ?? 0;
   }
 }

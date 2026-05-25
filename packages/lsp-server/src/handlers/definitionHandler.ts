@@ -15,7 +15,13 @@ import {
 
 type DefinitionNavigationTarget = Extract<
   ArgoYamlNavigationTarget,
-  { readonly kind: 'templateDefinition' | 'workflowTemplateDefinition' }
+  {
+    readonly kind:
+      | 'templateDefinition'
+      | 'localTemplateDefinition'
+      | 'dagTaskDefinition'
+      | 'workflowTemplateDefinition'
+  }
 >;
 
 class LspDocumentReader implements TextDocumentReader {
@@ -74,7 +80,12 @@ export class DefinitionHandler {
   private isDefinitionTarget(
     target: ArgoYamlNavigationTarget
   ): target is DefinitionNavigationTarget {
-    return target.kind === 'templateDefinition' || target.kind === 'workflowTemplateDefinition';
+    return (
+      target.kind === 'templateDefinition' ||
+      target.kind === 'localTemplateDefinition' ||
+      target.kind === 'dagTaskDefinition' ||
+      target.kind === 'workflowTemplateDefinition'
+    );
   }
 
   private async findDefinitionLocations(target: DefinitionNavigationTarget): Promise<Location[]> {
@@ -93,9 +104,7 @@ export class DefinitionHandler {
     target: ArgoYamlNavigationTarget
   ): Location {
     const line = document.getLine(params.position.line);
-    const name = target.kind === 'templateReferences'
-      ? target.templateName
-      : target.workflowTemplateName;
+    const name = this.getTargetName(target);
     const character = this.findNameStartCharacter(line, name) ?? params.position.character;
     const position = { line: params.position.line, character };
 
@@ -106,6 +115,22 @@ export class DefinitionHandler {
         end: position
       }
     };
+  }
+
+  private getTargetName(target: ArgoYamlNavigationTarget): string {
+    switch (target.kind) {
+      case 'templateDefinition':
+      case 'templateReferences':
+      case 'localTemplateDefinition':
+      case 'localTemplateReferences':
+        return target.templateName;
+      case 'dagTaskDefinition':
+      case 'dagTaskReferences':
+        return target.taskName;
+      case 'workflowTemplateDefinition':
+      case 'workflowTemplateReferences':
+        return target.workflowTemplateName;
+    }
   }
 
   private findNameStartCharacter(line: string, expectedValue: string): number | undefined {
@@ -129,12 +154,27 @@ export class DefinitionHandler {
         return this.templateSearchService.findTemplateInWorkflowTemplate(
           this.workspaceRoot,
           target.workflowTemplateName,
+          target.templateName,
+          target.clusterScope ?? false
+        );
+      case 'localTemplateDefinition':
+        return this.templateSearchService.findTemplateInArgoResource(
+          this.workspaceRoot,
+          target.resourceName,
           target.templateName
+        );
+      case 'dagTaskDefinition':
+        return this.templateSearchService.findDagTaskDefinition(
+          this.workspaceRoot,
+          target.resourceName,
+          target.templateName,
+          target.taskName
         );
       case 'workflowTemplateDefinition':
         return this.templateSearchService.findTemplateDefinition(
           this.workspaceRoot,
-          target.workflowTemplateName
+          target.workflowTemplateName,
+          target.clusterScope ?? false
         );
     }
   }

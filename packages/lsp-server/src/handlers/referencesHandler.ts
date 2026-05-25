@@ -66,23 +66,39 @@ export class ReferencesHandler {
       case 'templateReferences':
         return this.findTemplateReferences(
           target.workflowTemplateName,
+          target.templateName,
+          target.clusterScope ?? false
+        );
+      case 'localTemplateDefinition':
+      case 'localTemplateReferences':
+        return this.findLocalTemplateReferences(
+          target.resourceName,
           target.templateName
+        );
+      case 'dagTaskDefinition':
+      case 'dagTaskReferences':
+        return this.findDagTaskReferences(
+          target.resourceName,
+          target.templateName,
+          target.taskName
         );
       case 'workflowTemplateDefinition':
       case 'workflowTemplateReferences':
-        return this.findWorkflowTemplateReferences(target.workflowTemplateName);
+        return this.findWorkflowTemplateReferences(target.workflowTemplateName, target.clusterScope ?? false);
     }
   }
 
   private async findTemplateReferences(
     workflowTemplateName: string,
-    templateName: string
+    templateName: string,
+    clusterScope: boolean
   ): Promise<Location[]> {
     try {
       const searchResult = await this.templateSearchService.findTemplateReferences(
         this.workspaceRoot,
         workflowTemplateName,
-        templateName
+        templateName,
+        clusterScope
       );
 
       return this.toLocations(searchResult.locations);
@@ -92,16 +108,55 @@ export class ReferencesHandler {
     }
   }
 
-  private async findWorkflowTemplateReferences(templateName: string): Promise<Location[]> {
+  private async findWorkflowTemplateReferences(templateName: string, clusterScope: boolean): Promise<Location[]> {
     try {
       const searchResult = await this.templateSearchService.findWorkflowTemplateReferences(
         this.workspaceRoot,
-        templateName
+        templateName,
+        clusterScope
       );
 
       return this.toLocations(searchResult.locations);
     } catch (error) {
       console.error("Error finding WorkflowTemplate references:", error);
+      return [];
+    }
+  }
+
+  private async findLocalTemplateReferences(
+    resourceName: string,
+    templateName: string
+  ): Promise<Location[]> {
+    try {
+      const searchResult = await this.templateSearchService.findLocalTemplateReferences(
+        this.workspaceRoot,
+        resourceName,
+        templateName
+      );
+
+      return this.toLocations(searchResult.locations);
+    } catch (error) {
+      console.error("Error finding local template references:", error);
+      return [];
+    }
+  }
+
+  private async findDagTaskReferences(
+    resourceName: string,
+    templateName: string,
+    taskName: string
+  ): Promise<Location[]> {
+    try {
+      const searchResult = await this.templateSearchService.findDagTaskReferences(
+        this.workspaceRoot,
+        resourceName,
+        templateName,
+        taskName
+      );
+
+      return this.toLocations(searchResult.locations);
+    } catch (error) {
+      console.error('Error finding DAG task references:', error);
       return [];
     }
   }
