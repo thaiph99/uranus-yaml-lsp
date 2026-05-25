@@ -7,6 +7,8 @@ Navigation has two stages:
 
 VS Code and the LSP server are adapters: they convert editor documents and positions to core inputs and convert core locations back to editor locations.
 
+Shared YAML vocabulary, such as Argo resource kinds, navigation scalar values, and indentation, belongs in `argoYamlSyntax.ts`. Keep editor protocol concerns out of core parsing and keep YAML regular expressions out of adapters.
+
 ## Commands
 
 - Use Go to Definition (`F12`, Ctrl+Click in VS Code, or `gd` in Neovim) on a call value.
