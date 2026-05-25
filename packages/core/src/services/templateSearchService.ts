@@ -1,4 +1,13 @@
 import { WorkflowTemplateLocation, TemplateSearchResult } from "../types";
+import {
+  extractKeyValue,
+  extractNavigationValue,
+  getIndent,
+  getReusableTemplateKind,
+  isArgoResourceLine,
+  NavigationKey,
+  ReusableTemplateKind
+} from "./argoYamlSyntax";
 import { FileSystemService } from "./fileSystemService";
 
 interface CachedFileContent {
@@ -6,9 +15,7 @@ interface CachedFileContent {
   timestamp: number;
 }
 
-type ReusableTemplateKind = "WorkflowTemplate" | "ClusterWorkflowTemplate";
 type ContentSearch = (content: string, filePath: string) => WorkflowTemplateLocation[];
-type NavigationKey = "name" | "template" | "entrypoint" | "onExit";
 
 interface ValueLocation {
   readonly value: string;
@@ -107,7 +114,7 @@ export class TemplateSearchService {
         filePath,
         workflowTemplateName,
         templateName,
-        this.getReusableTemplateKind(clusterScope)
+        getReusableTemplateKind(clusterScope)
       )
     );
 
@@ -416,7 +423,7 @@ export class TemplateSearchService {
         continue;
       }
 
-      const value = this.extractKeyValue(line, key);
+      const value = extractKeyValue(line, key);
       if (value !== templateName) {
         continue;
       }
@@ -448,7 +455,7 @@ export class TemplateSearchService {
 
     for (let i = dagTasksSection.tasksStart + 1; i < dagTasksSection.tasksEnd; i++) {
       const line = lines[i];
-      if (this.getIndent(line) !== dagTasksSection.taskIndent) {
+      if (getIndent(line) !== dagTasksSection.taskIndent) {
         continue;
       }
 
@@ -514,7 +521,7 @@ export class TemplateSearchService {
     let name: ValueLocation | undefined;
     let template: ValueLocation | undefined;
     let clusterScope = false;
-    const blockIndent = this.getIndent(lines[startIndex]);
+    const blockIndent = getIndent(lines[startIndex]);
 
     for (let i = startIndex + 1; i < lines.length; i++) {
       const line = lines[i];
@@ -522,16 +529,16 @@ export class TemplateSearchService {
       if (line.trim() === "" || /^\s*#/.test(line)) {
         continue;
       }
-      if (this.getIndent(line) <= blockIndent) {
+      if (getIndent(line) <= blockIndent) {
         break;
       }
 
-      const nameValue = this.extractKeyValue(line, "name");
+      const nameValue = extractKeyValue(line, "name");
       if (nameValue && !name) {
         name = { value: nameValue, line: i, ...this.getKeyValueRange(line, "name", nameValue) };
       }
 
-      const templateValue = this.extractKeyValue(line, "template");
+      const templateValue = extractKeyValue(line, "template");
       if (templateValue) {
         template = { value: templateValue, line: i, ...this.getKeyValueRange(line, "template", templateValue) };
       }
@@ -581,12 +588,8 @@ export class TemplateSearchService {
     keysToDelete.forEach((key) => this.fileCache.delete(key));
   }
 
-  private getReusableTemplateKind(clusterScope: boolean): ReusableTemplateKind {
-    return clusterScope ? "ClusterWorkflowTemplate" : "WorkflowTemplate";
-  }
-
   private isReusableTemplateLine(line: string, clusterScope: boolean): boolean {
-    return new RegExp(`^\\s*kind:\\s*${this.getReusableTemplateKind(clusterScope)}\\s*(?:#.*)?$`).test(line);
+    return new RegExp(`^\\s*kind:\\s*${getReusableTemplateKind(clusterScope)}\\s*(?:#.*)?$`).test(line);
   }
 
   private findTemplateNameLine(
@@ -647,7 +650,7 @@ export class TemplateSearchService {
     for (let i = 0; i < lines.length; i++) {
       if (resourceKind
         ? !new RegExp(`^\\s*kind:\\s*${resourceKind}\\s*(?:#.*)?$`).test(lines[i])
-        : !this.isArgoResourceLine(lines[i])) {
+        : !isArgoResourceLine(lines[i])) {
         continue;
       }
 
@@ -688,13 +691,13 @@ export class TemplateSearchService {
     templatesEnd: number,
     templateName: string
   ): number {
-    const templateDefinitionIndent = this.getIndent(lines[templatesStart]) + 2;
+    const templateDefinitionIndent = getIndent(lines[templatesStart]) + 2;
 
     for (let i = templatesStart + 1; i < templatesEnd; i++) {
       const line = lines[i];
 
       if (
-        this.getIndent(line) === templateDefinitionIndent &&
+        getIndent(line) === templateDefinitionIndent &&
         line.match(/^\s*-\s+name:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/)
       ) {
         const nameMatch = line.match(/name:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
@@ -743,7 +746,7 @@ export class TemplateSearchService {
       return undefined;
     }
 
-    const tasksIndent = this.getIndent(lines[tasksStart]);
+    const tasksIndent = getIndent(lines[tasksStart]);
     const tasksEnd = this.findIndentedBlockEnd(lines, tasksStart, templateEnd);
 
     return {
@@ -754,7 +757,7 @@ export class TemplateSearchService {
   }
 
   private findTemplateBlockEnd(lines: string[], templateStart: number, resourceEnd: number): number {
-    const templateIndent = this.getIndent(lines[templateStart]);
+    const templateIndent = getIndent(lines[templateStart]);
 
     for (let i = templateStart + 1; i < resourceEnd; i++) {
       const line = lines[i];
@@ -762,7 +765,7 @@ export class TemplateSearchService {
         continue;
       }
 
-      if (this.getIndent(line) === templateIndent && /^\s*-\s+name:\s*/.test(line)) {
+      if (getIndent(line) === templateIndent && /^\s*-\s+name:\s*/.test(line)) {
         return i;
       }
     }
@@ -776,7 +779,7 @@ export class TemplateSearchService {
     parentEnd: number,
     key: "dag" | "tasks"
   ): number {
-    const parentIndent = this.getIndent(lines[parentStart]);
+    const parentIndent = getIndent(lines[parentStart]);
 
     for (let i = parentStart + 1; i < parentEnd; i++) {
       const line = lines[i];
@@ -784,7 +787,7 @@ export class TemplateSearchService {
         continue;
       }
 
-      const indent = this.getIndent(line);
+      const indent = getIndent(line);
       if (indent <= parentIndent) {
         return -1;
       }
@@ -798,7 +801,7 @@ export class TemplateSearchService {
   }
 
   private findIndentedBlockEnd(lines: string[], blockStart: number, maxEnd: number): number {
-    const blockIndent = this.getIndent(lines[blockStart]);
+    const blockIndent = getIndent(lines[blockStart]);
 
     for (let i = blockStart + 1; i < maxEnd; i++) {
       const line = lines[i];
@@ -806,7 +809,7 @@ export class TemplateSearchService {
         continue;
       }
 
-      if (this.getIndent(line) <= blockIndent) {
+      if (getIndent(line) <= blockIndent) {
         return i;
       }
     }
@@ -876,7 +879,7 @@ export class TemplateSearchService {
     taskName: string
   ): { line: number; character: number; endCharacter: number }[] {
     const ranges: { line: number; character: number; endCharacter: number }[] = [];
-    const dependenciesIndent = this.getIndent(lines[dependenciesLine]);
+    const dependenciesIndent = getIndent(lines[dependenciesLine]);
 
     for (let i = dependenciesLine + 1; i < tasksEnd; i++) {
       const line = lines[i];
@@ -884,7 +887,7 @@ export class TemplateSearchService {
         continue;
       }
 
-      if (this.getIndent(line) <= dependenciesIndent) {
+      if (getIndent(line) <= dependenciesIndent) {
         break;
       }
 
@@ -980,7 +983,7 @@ export class TemplateSearchService {
   }
 
   private skipMultilineDependencies(lines: string[], dependenciesLine: number, tasksEnd: number): number {
-    const dependenciesIndent = this.getIndent(lines[dependenciesLine]);
+    const dependenciesIndent = getIndent(lines[dependenciesLine]);
 
     for (let i = dependenciesLine + 1; i < tasksEnd; i++) {
       const line = lines[i];
@@ -988,7 +991,7 @@ export class TemplateSearchService {
         continue;
       }
 
-      if (this.getIndent(line) <= dependenciesIndent) {
+      if (getIndent(line) <= dependenciesIndent) {
         return i - 1;
       }
     }
@@ -1015,12 +1018,12 @@ export class TemplateSearchService {
   }
 
   private isTemplateRefValueLine(lines: string[], lineIndex: number): boolean {
-    const lineIndent = this.getIndent(lines[lineIndex]);
+    const lineIndent = getIndent(lines[lineIndex]);
     const startIndex = Math.max(0, lineIndex - 10);
 
     for (let i = lineIndex - 1; i >= startIndex; i--) {
       const line = lines[i];
-      const indent = this.getIndent(line);
+      const indent = getIndent(line);
       if (indent < lineIndent && line.includes("templateRef:")) {
         return true;
       }
@@ -1032,21 +1035,7 @@ export class TemplateSearchService {
     return false;
   }
 
-  private isArgoResourceLine(line: string): boolean {
-    return /kind:\s*(Workflow|CronWorkflow|WorkflowTemplate|ClusterWorkflowTemplate)\s*(?:#.*)?$/.test(line);
-  }
-
   private isResourceName(line: string, resourceName: string): boolean {
-    const nameMatch = line.match(/(?:name|generateName):\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
-    return nameMatch?.[1] === resourceName;
-  }
-
-  private extractKeyValue(line: string, key: NavigationKey): string | undefined {
-    const match = line.match(new RegExp(`${key}:\\s*['"]?([^'"#\\s]+)['"]?\\s*(?:#.*)?$`));
-    return match?.[1];
-  }
-
-  private getIndent(line: string): number {
-    return line.match(/^\s*/)?.[0].length ?? 0;
+    return extractNavigationValue(line) === resourceName;
   }
 }

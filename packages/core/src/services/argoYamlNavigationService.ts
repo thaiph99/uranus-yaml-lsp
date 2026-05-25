@@ -1,4 +1,12 @@
 import { TemplateRefContext } from "../types";
+import {
+  ArgoResourceKind,
+  extractNavigationValue,
+  getArgoResourceKind,
+  getIndent,
+  isArgoResourceLine,
+  isReusableTemplateKind
+} from "./argoYamlSyntax";
 
 export interface DocumentPosition {
   readonly line: number;
@@ -61,8 +69,6 @@ export interface TemplateReferenceContext {
   readonly templateName: string;
 }
 
-type ArgoResourceKind = "Workflow" | "CronWorkflow" | "WorkflowTemplate" | "ClusterWorkflowTemplate";
-
 interface ArgoResourceContext {
   readonly kind: ArgoResourceKind;
   readonly name: string;
@@ -113,7 +119,7 @@ export class ArgoYamlNavigationService {
 
     const templateDefinition = this.getTemplateDefinitionContext(document, position);
     if (templateDefinition) {
-      if (this.isReusableTemplateKind(templateDefinition.resource.kind)) {
+      if (isReusableTemplateKind(templateDefinition.resource.kind)) {
         return {
           kind: "templateReferences",
           workflowTemplateName: templateDefinition.resource.name,
@@ -219,7 +225,7 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    if (this.getIndent(currentLine) !== this.getIndent(document.getLine(dagTasksLineIndex)) + 2) {
+    if (getIndent(currentLine) !== getIndent(document.getLine(dagTasksLineIndex)) + 2) {
       return undefined;
     }
 
@@ -276,14 +282,14 @@ export class ArgoYamlNavigationService {
       return false;
     }
 
-    const listIndent = this.getIndent(line);
+    const listIndent = getIndent(line);
     for (let lineIndex = position.line - 1; lineIndex >= 0; lineIndex--) {
       const candidateLine = document.getLine(lineIndex);
       if (candidateLine.trim().length === 0) {
         continue;
       }
 
-      const candidateIndent = this.getIndent(candidateLine);
+      const candidateIndent = getIndent(candidateLine);
       if (candidateIndent >= listIndent) {
         continue;
       }
@@ -298,7 +304,7 @@ export class ArgoYamlNavigationService {
     document: TextDocumentReader,
     position: DocumentPosition
   ): number {
-    const positionIndent = this.getIndent(document.getLine(position.line));
+    const positionIndent = getIndent(document.getLine(position.line));
 
     for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
       const line = document.getLine(lineIndex);
@@ -306,7 +312,7 @@ export class ArgoYamlNavigationService {
         continue;
       }
 
-      const tasksIndent = this.getIndent(line);
+      const tasksIndent = getIndent(line);
       if (position.line !== lineIndex && positionIndent <= tasksIndent) {
         continue;
       }
@@ -335,7 +341,7 @@ export class ArgoYamlNavigationService {
         continue;
       }
 
-      if (this.getIndent(line) <= sectionIndent) {
+      if (getIndent(line) <= sectionIndent) {
         return true;
       }
     }
@@ -344,7 +350,7 @@ export class ArgoYamlNavigationService {
   }
 
   private isDagTasksSection(document: TextDocumentReader, tasksLineIndex: number): boolean {
-    const tasksIndent = this.getIndent(document.getLine(tasksLineIndex));
+    const tasksIndent = getIndent(document.getLine(tasksLineIndex));
 
     for (let lineIndex = tasksLineIndex - 1; lineIndex >= 0; lineIndex--) {
       const line = document.getLine(lineIndex);
@@ -352,7 +358,7 @@ export class ArgoYamlNavigationService {
         continue;
       }
 
-      const indent = this.getIndent(line);
+      const indent = getIndent(line);
       if (indent >= tasksIndent) {
         continue;
       }
@@ -369,7 +375,7 @@ export class ArgoYamlNavigationService {
   ): string | undefined {
     for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
       const line = document.getLine(lineIndex);
-      if (lineIndex < position.line && this.isArgoResourceKindLine(line)) {
+      if (lineIndex < position.line && isArgoResourceLine(line)) {
         return undefined;
       }
       if (!/^\s*-\s+name:\s*(.+)$/.test(line)) {
@@ -377,7 +383,7 @@ export class ArgoYamlNavigationService {
       }
 
       if (this.isDirectTemplateDefinition(document, { line: lineIndex, character: line.indexOf("name:") + 6 })) {
-        return this.extractNameValue(line);
+        return extractNavigationValue(line);
       }
     }
 
@@ -462,7 +468,7 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    const blockIndent = this.getIndent(document.getLine(blockLine));
+    const blockIndent = getIndent(document.getLine(blockLine));
     let workflowTemplateName: string | undefined;
     let templateName: string | undefined;
     let clusterScope = false;
@@ -472,13 +478,13 @@ export class ArgoYamlNavigationService {
       if (line.trim().length === 0 || /^\s*#/.test(line)) {
         continue;
       }
-      if (this.getIndent(line) <= blockIndent) {
+      if (getIndent(line) <= blockIndent) {
         break;
       }
       if (/^\s*name:\s*/.test(line) && !workflowTemplateName) {
-        workflowTemplateName = this.extractNameValue(line);
+        workflowTemplateName = extractNavigationValue(line);
       } else if (/^\s*template:\s*/.test(line)) {
-        templateName = this.extractNameValue(line);
+        templateName = extractNavigationValue(line);
       } else if (/^\s*clusterScope:\s*true\s*(?:#.*)?$/.test(line)) {
         clusterScope = true;
       }
@@ -502,7 +508,7 @@ export class ArgoYamlNavigationService {
     }
 
     if (this.hasNavigationValue(line)) {
-      return this.extractNameValue(line);
+      return extractNavigationValue(line);
     }
 
     return undefined;
@@ -567,12 +573,12 @@ export class ArgoYamlNavigationService {
     key: ReusableTemplateRefKey
   ): number | undefined {
     const startLine = Math.max(0, position.line - 15);
-    const valueIndent = this.getIndent(document.getLine(position.line));
+    const valueIndent = getIndent(document.getLine(position.line));
     const blockPattern = new RegExp(`^\\s*${key}:\\s*(?:#.*)?$`);
 
     for (let lineIndex = position.line; lineIndex >= startLine; lineIndex--) {
       const line = document.getLine(lineIndex);
-      const blockIndent = this.getIndent(line);
+      const blockIndent = getIndent(line);
       if (blockPattern.test(line) &&
           blockIndent < valueIndent &&
           !this.hasSectionBoundaryBetween(document, lineIndex, position.line, blockIndent)) {
@@ -615,7 +621,7 @@ export class ArgoYamlNavigationService {
       return false;
     }
 
-    return this.getIndent(document.getLine(position.line)) === this.getIndent(document.getLine(templatesLineIndex)) + 2;
+    return getIndent(document.getLine(position.line)) === getIndent(document.getLine(templatesLineIndex)) + 2;
   }
 
   private findContainingTemplatesSection(
@@ -641,7 +647,7 @@ export class ArgoYamlNavigationService {
   ): ArgoResourceContext | undefined {
     for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
       const line = document.getLine(lineIndex);
-      const kind = this.getArgoResourceKind(line);
+      const kind = getArgoResourceKind(line);
       if (!kind) {
         continue;
       }
@@ -650,17 +656,13 @@ export class ArgoYamlNavigationService {
       for (let metadataLineIndex = lineIndex + 1; metadataLineIndex < endLine; metadataLineIndex++) {
         const metadataLine = document.getLine(metadataLineIndex);
         if (metadataLine.includes("name:") || metadataLine.includes("generateName:")) {
-          const name = this.extractNameValue(metadataLine);
+          const name = extractNavigationValue(metadataLine);
           return name ? { kind, name } : undefined;
         }
       }
     }
 
     return undefined;
-  }
-
-  private isReusableTemplateKind(kind: ArgoResourceKind): boolean {
-    return kind === "WorkflowTemplate" || kind === "ClusterWorkflowTemplate";
   }
 
   private getWorkflowTemplateDefinitionName(
@@ -673,7 +675,7 @@ export class ArgoYamlNavigationService {
     }
 
     const resource = this.getContainingArgoResource(document, position);
-    if (!resource || !this.isReusableTemplateKind(resource.kind)) {
+    if (!resource || !isReusableTemplateKind(resource.kind)) {
       return undefined;
     }
 
@@ -706,11 +708,6 @@ export class ArgoYamlNavigationService {
     }
 
     return foundWorkflowTemplate && foundMetadata;
-  }
-
-  private extractNameValue(line: string): string | undefined {
-    const nameMatch = line.match(/(?:name|generateName|template|entrypoint|onExit):\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
-    return nameMatch?.[1];
   }
 
   private getLocalTemplateCallContext(
@@ -757,15 +754,4 @@ export class ArgoYamlNavigationService {
     );
   }
 
-  private isArgoResourceKindLine(line: string): boolean {
-    return this.getArgoResourceKind(line) !== undefined;
-  }
-
-  private getArgoResourceKind(line: string): ArgoResourceKind | undefined {
-    return line.match(/kind:\s*(Workflow|CronWorkflow|WorkflowTemplate|ClusterWorkflowTemplate)\s*(?:#.*)?$/)?.[1] as ArgoResourceKind | undefined;
-  }
-
-  private getIndent(line: string): number {
-    return line.match(/^\s*/)?.[0].length ?? 0;
-  }
 }
