@@ -1,7 +1,7 @@
 import { WorkflowTemplateLocation, TemplateSearchResult } from "../types";
 import {
   extractKeyValue,
-  extractNavigationValue,
+  getArgoResourceKind,
   getIndent,
   getReusableTemplateKind,
   isArgoResourceLine,
@@ -244,7 +244,7 @@ export class TemplateSearchService {
     }
 
     for (const startIndex of resourceLines) {
-      const nameLineIndex = this.findTemplateNameLine(
+      const nameLineIndex = this.findResourceNameLine(
         lines,
         startIndex,
         templateName
@@ -269,36 +269,16 @@ export class TemplateSearchService {
     clusterScope: boolean
   ): WorkflowTemplateLocation[] {
     const lines = content.split("\n");
-    const locations: WorkflowTemplateLocation[] = [];
-
-    const resourceStart = this.findReusableTemplateByName(lines, workflowTemplateName, clusterScope);
-    if (resourceStart === -1) {
-      return locations;
-    }
-
-    const resourceEnd = this.findResourceEnd(lines, resourceStart);
-
-    const templatesSection = this.findTemplatesSection(lines, resourceStart, resourceEnd);
-    if (templatesSection === -1) {
-      return locations;
-    }
-
-    const templateLocation = this.findTemplateInTemplatesSection(
+    const resourceStart = this.findArgoResourceByName(
       lines,
-      templatesSection,
-      resourceEnd,
-      templateName
+      workflowTemplateName,
+      getReusableTemplateKind(clusterScope)
     );
-
-    if (templateLocation !== -1) {
-      locations.push({
-        file: filePath,
-        line: templateLocation,
-        ...this.getNameValueRange(lines[templateLocation], templateName),
-      });
+    if (resourceStart === -1) {
+      return [];
     }
 
-    return locations;
+    return this.locateTemplateDefinition(lines, filePath, resourceStart, templateName);
   }
 
   private searchTemplateInArgoResourceContent(
@@ -308,17 +288,24 @@ export class TemplateSearchService {
     templateName: string
   ): WorkflowTemplateLocation[] {
     const lines = content.split("\n");
-    const locations: WorkflowTemplateLocation[] = [];
-
     const resourceStart = this.findArgoResourceByName(lines, resourceName);
     if (resourceStart === -1) {
-      return locations;
+      return [];
     }
 
+    return this.locateTemplateDefinition(lines, filePath, resourceStart, templateName);
+  }
+
+  private locateTemplateDefinition(
+    lines: string[],
+    filePath: string,
+    resourceStart: number,
+    templateName: string
+  ): WorkflowTemplateLocation[] {
     const resourceEnd = this.findResourceEnd(lines, resourceStart);
     const templatesSection = this.findTemplatesSection(lines, resourceStart, resourceEnd);
     if (templatesSection === -1) {
-      return locations;
+      return [];
     }
 
     const templateLocation = this.findTemplateInTemplatesSection(
@@ -328,15 +315,15 @@ export class TemplateSearchService {
       templateName
     );
 
-    if (templateLocation !== -1) {
-      locations.push({
-        file: filePath,
-        line: templateLocation,
-        ...this.getNameValueRange(lines[templateLocation], templateName),
-      });
+    if (templateLocation === -1) {
+      return [];
     }
 
-    return locations;
+    return [{
+      file: filePath,
+      line: templateLocation,
+      ...this.getNameValueRange(lines[templateLocation], templateName),
+    }];
   }
 
   private searchTemplateReferencesInContent(
@@ -459,7 +446,7 @@ export class TemplateSearchService {
         continue;
       }
 
-      if (!/^\s*-\s+name:\s*/.test(line) || !this.isTemplateName(line, taskName)) {
+      if (!/^\s*-\s+name:\s*/.test(line) || !this.hasNameValue(line, taskName)) {
         continue;
       }
 
@@ -589,10 +576,10 @@ export class TemplateSearchService {
   }
 
   private isReusableTemplateLine(line: string, clusterScope: boolean): boolean {
-    return new RegExp(`^\\s*kind:\\s*${getReusableTemplateKind(clusterScope)}\\s*(?:#.*)?$`).test(line);
+    return getArgoResourceKind(line) === getReusableTemplateKind(clusterScope);
   }
 
-  private findTemplateNameLine(
+  private findResourceNameLine(
     lines: string[],
     startIndex: number,
     templateName: string
@@ -602,7 +589,7 @@ export class TemplateSearchService {
       const line = lines[j];
       if (
         this.isMetadataSection(lines, j) &&
-        this.isTemplateName(line, templateName)
+        this.hasNameValue(line, templateName)
       ) {
         return j;
       }
@@ -614,32 +601,8 @@ export class TemplateSearchService {
     return currentIndex > 0 && lines[currentIndex - 1].includes("metadata:");
   }
 
-  private isTemplateName(line: string, templateName: string): boolean {
-    const nameMatch = line.match(/name:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
-    if (!nameMatch) {
-      return false;
-    }
-
-    const extractedName = nameMatch[1];
-    return extractedName === templateName;
-  }
-
-  private findReusableTemplateByName(
-    lines: string[],
-    workflowTemplateName: string,
-    clusterScope: boolean
-  ): number {
-    for (let i = 0; i < lines.length; i++) {
-      if (this.isReusableTemplateLine(lines[i], clusterScope)) {
-        for (let j = i; j < Math.min(lines.length, i + 20); j++) {
-          const line = lines[j];
-          if (this.isMetadataSection(lines, j) && this.isTemplateName(line, workflowTemplateName)) {
-            return i;
-          }
-        }
-      }
-    }
-    return -1;
+  private hasNameValue(line: string, expectedName: string): boolean {
+    return extractKeyValue(line, "name") === expectedName;
   }
 
   private findArgoResourceByName(
@@ -649,14 +612,13 @@ export class TemplateSearchService {
   ): number {
     for (let i = 0; i < lines.length; i++) {
       if (resourceKind
-        ? !new RegExp(`^\\s*kind:\\s*${resourceKind}\\s*(?:#.*)?$`).test(lines[i])
+        ? getArgoResourceKind(lines[i]) !== resourceKind
         : !isArgoResourceLine(lines[i])) {
         continue;
       }
 
       for (let j = i; j < Math.min(lines.length, i + 20); j++) {
-        const line = lines[j];
-        if (this.isMetadataSection(lines, j) && this.isResourceName(line, resourceName)) {
+        if (this.isMetadataSection(lines, j) && this.hasResourceName(lines[j], resourceName)) {
           return i;
         }
       }
@@ -700,8 +662,7 @@ export class TemplateSearchService {
         getIndent(line) === templateDefinitionIndent &&
         line.match(/^\s*-\s+name:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/)
       ) {
-        const nameMatch = line.match(/name:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
-        if (nameMatch && nameMatch[1] === templateName) {
+        if (this.hasNameValue(line, templateName)) {
           return i;
         }
       }
@@ -1035,7 +996,8 @@ export class TemplateSearchService {
     return false;
   }
 
-  private isResourceName(line: string, resourceName: string): boolean {
-    return extractNavigationValue(line) === resourceName;
+  private hasResourceName(line: string, resourceName: string): boolean {
+    return extractKeyValue(line, "name") === resourceName ||
+      extractKeyValue(line, "generateName") === resourceName;
   }
 }
