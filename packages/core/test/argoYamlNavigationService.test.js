@@ -190,6 +190,33 @@ spec:
   );
 });
 
+test('keeps local template calls after templateRef blocks in local scope', () => {
+  const document = new TestDocumentReader(`apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: mixed-calls
+spec:
+  templates:
+    - name: main
+      steps:
+        - - name: external
+            templateRef:
+              name: shared-library
+              template: remote-step
+        - - name: local
+            template: local-step
+    - name: local-step`);
+
+  assert.deepStrictEqual(
+    service.getNavigationTarget(document, { line: 13, character: 24 }),
+    {
+      kind: 'localTemplateDefinition',
+      resourceName: 'mixed-calls',
+      templateName: 'local-step',
+    }
+  );
+});
+
 test('does not treat step names as template definitions', () => {
   const document = new TestDocumentReader(`apiVersion: argoproj.io/v1alpha1
 kind: Workflow
@@ -260,6 +287,14 @@ spec:
       kind: 'templateDefinition',
       workflowTemplateName: 'shared-library',
       templateName: 'step1',
+      clusterScope: true,
+    }
+  );
+  assert.deepStrictEqual(
+    service.getNavigationTarget(document, { line: 13, character: 20 }),
+    {
+      kind: 'workflowTemplateDefinition',
+      workflowTemplateName: 'shared-library',
       clusterScope: true,
     }
   );
