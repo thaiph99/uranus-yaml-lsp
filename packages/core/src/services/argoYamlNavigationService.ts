@@ -8,7 +8,6 @@ export interface DocumentPosition {
 export interface TextDocumentReader {
   readonly lineCount: number;
   getLine(line: number): string;
-  getTextInRange(startLine: number, endLine: number): string;
 }
 
 export type ArgoYamlNavigationTarget =
@@ -62,6 +61,18 @@ export interface TemplateReferenceContext {
   readonly templateName: string;
 }
 
+type ArgoResourceKind = "Workflow" | "CronWorkflow" | "WorkflowTemplate" | "ClusterWorkflowTemplate";
+
+interface ArgoResourceContext {
+  readonly kind: ArgoResourceKind;
+  readonly name: string;
+}
+
+interface LocalTemplateContext {
+  readonly resource: ArgoResourceContext;
+  readonly templateName: string;
+}
+
 export class ArgoYamlNavigationService {
   public getNavigationTarget(
     document: TextDocumentReader,
@@ -94,18 +105,18 @@ export class ArgoYamlNavigationService {
 
     const templateDefinition = this.getTemplateDefinitionContext(document, position);
     if (templateDefinition) {
-      if (this.isReusableTemplateResource(document, position)) {
+      if (this.isReusableTemplateKind(templateDefinition.resource.kind)) {
         return {
           kind: "templateReferences",
-          workflowTemplateName: templateDefinition.workflowTemplateName,
+          workflowTemplateName: templateDefinition.resource.name,
           templateName: templateDefinition.templateName,
-          ...(this.isClusterWorkflowTemplateResource(document, position) ? { clusterScope: true } : {})
+          ...(templateDefinition.resource.kind === "ClusterWorkflowTemplate" ? { clusterScope: true } : {})
         };
       }
 
       return {
         kind: "localTemplateReferences",
-        resourceName: templateDefinition.workflowTemplateName,
+        resourceName: templateDefinition.resource.name,
         templateName: templateDefinition.templateName
       };
     }
@@ -142,7 +153,7 @@ export class ArgoYamlNavigationService {
     if (localTemplateCall) {
       return {
         kind: "localTemplateDefinition",
-        resourceName: localTemplateCall.workflowTemplateName,
+        resourceName: localTemplateCall.resource.name,
         templateName: localTemplateCall.templateName
       };
     }
@@ -159,12 +170,12 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    const workflowTemplateName = this.getContainingWorkflowTemplateName(document, position);
-    if (!workflowTemplateName) {
+    const resourceName = this.getContainingArgoResource(document, position)?.name;
+    if (!resourceName) {
       return undefined;
     }
 
-    return { workflowTemplateName, templateName };
+    return { workflowTemplateName: resourceName, templateName };
   }
 
   public getWorkflowTemplateNameAtPosition(
@@ -206,7 +217,7 @@ export class ArgoYamlNavigationService {
 
     const taskName = this.getNameAtPosition(document, position);
     const templateName = this.getContainingTemplateName(document, position);
-    const resourceName = this.getContainingArgoResourceName(document, position);
+    const resourceName = this.getContainingArgoResource(document, position)?.name;
     if (!taskName || !templateName || !resourceName) {
       return undefined;
     }
@@ -236,7 +247,7 @@ export class ArgoYamlNavigationService {
     }
 
     const templateName = this.getContainingTemplateName(document, position);
-    const resourceName = this.getContainingArgoResourceName(document, position);
+    const resourceName = this.getContainingArgoResource(document, position)?.name;
     if (!templateName || !resourceName) {
       return undefined;
     }
@@ -577,7 +588,7 @@ export class ArgoYamlNavigationService {
   private getTemplateDefinitionContext(
     document: TextDocumentReader,
     position: DocumentPosition
-  ): TemplateReferenceContext | undefined {
+  ): LocalTemplateContext | undefined {
     const currentLine = document.getLine(position.line);
     if (!currentLine.includes("name:") || !/^\s*-\s+name:\s*(.+)$/.test(currentLine)) {
       return undefined;
@@ -588,13 +599,13 @@ export class ArgoYamlNavigationService {
     }
 
     const templateName = this.getNameAtPosition(document, position);
-    const workflowTemplateName = this.getContainingArgoResourceName(document, position);
+    const resource = this.getContainingArgoResource(document, position);
 
-    if (!templateName || !workflowTemplateName) {
+    if (!templateName || !resource) {
       return undefined;
     }
 
-    return { workflowTemplateName, templateName };
+    return { resource, templateName };
   }
 
   private isDirectTemplateDefinition(
@@ -626,20 +637,14 @@ export class ArgoYamlNavigationService {
     return -1;
   }
 
-  private getContainingWorkflowTemplateName(
+  private getContainingArgoResource(
     document: TextDocumentReader,
     position: DocumentPosition
-  ): string | undefined {
-    return this.getContainingArgoResourceName(document, position);
-  }
-
-  private getContainingArgoResourceName(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): string | undefined {
+  ): ArgoResourceContext | undefined {
     for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
       const line = document.getLine(lineIndex);
-      if (!this.isArgoResourceKindLine(line)) {
+      const kind = this.getArgoResourceKind(line);
+      if (!kind) {
         continue;
       }
 
@@ -647,7 +652,8 @@ export class ArgoYamlNavigationService {
       for (let metadataLineIndex = lineIndex + 1; metadataLineIndex < endLine; metadataLineIndex++) {
         const metadataLine = document.getLine(metadataLineIndex);
         if (metadataLine.includes("name:") || metadataLine.includes("generateName:")) {
-          return this.extractNameValue(metadataLine);
+          const name = this.extractNameValue(metadataLine);
+          return name ? { kind, name } : undefined;
         }
       }
     }
@@ -655,38 +661,8 @@ export class ArgoYamlNavigationService {
     return undefined;
   }
 
-  private isReusableTemplateResource(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): boolean {
-    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
-      const line = document.getLine(lineIndex);
-      if (line.includes("kind: WorkflowTemplate") || line.includes("kind: ClusterWorkflowTemplate")) {
-        return true;
-      }
-      if (this.isArgoResourceKindLine(line)) {
-        return false;
-      }
-    }
-
-    return false;
-  }
-
-  private isClusterWorkflowTemplateResource(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): boolean {
-    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
-      const line = document.getLine(lineIndex);
-      if (line.includes("kind: ClusterWorkflowTemplate")) {
-        return true;
-      }
-      if (this.isArgoResourceKindLine(line)) {
-        return false;
-      }
-    }
-
-    return false;
+  private isReusableTemplateKind(kind: ArgoResourceKind): boolean {
+    return kind === "WorkflowTemplate" || kind === "ClusterWorkflowTemplate";
   }
 
   private getWorkflowTemplateDefinitionName(
@@ -698,14 +674,14 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    const workflowTemplateName = this.extractNameValue(currentLine);
-    if (!workflowTemplateName) {
+    const resource = this.getContainingArgoResource(document, position);
+    if (!resource || !this.isReusableTemplateKind(resource.kind)) {
       return undefined;
     }
 
     return {
-      workflowTemplateName,
-      ...(this.isClusterWorkflowTemplateResource(document, position) ? { clusterScope: true } : {})
+      workflowTemplateName: resource.name,
+      ...(resource.kind === "ClusterWorkflowTemplate" ? { clusterScope: true } : {})
     };
   }
 
@@ -742,19 +718,19 @@ export class ArgoYamlNavigationService {
   private getLocalTemplateCallContext(
     document: TextDocumentReader,
     position: DocumentPosition
-  ): TemplateReferenceContext | undefined {
+  ): LocalTemplateContext | undefined {
     const currentLine = document.getLine(position.line);
     if (!this.isLocalTemplateCallLine(document, position, currentLine)) {
       return undefined;
     }
 
     const templateName = this.getNameAtPosition(document, position);
-    const workflowTemplateName = this.getContainingArgoResourceName(document, position);
-    if (!templateName || !workflowTemplateName) {
+    const resource = this.getContainingArgoResource(document, position);
+    if (!templateName || !resource) {
       return undefined;
     }
 
-    return { workflowTemplateName, templateName };
+    return { resource, templateName };
   }
 
   private isLocalTemplateCallLine(
@@ -784,7 +760,11 @@ export class ArgoYamlNavigationService {
   }
 
   private isArgoResourceKindLine(line: string): boolean {
-    return /kind:\s*(Workflow|CronWorkflow|WorkflowTemplate|ClusterWorkflowTemplate)\s*(?:#.*)?$/.test(line);
+    return this.getArgoResourceKind(line) !== undefined;
+  }
+
+  private getArgoResourceKind(line: string): ArgoResourceKind | undefined {
+    return line.match(/kind:\s*(Workflow|CronWorkflow|WorkflowTemplate|ClusterWorkflowTemplate)\s*(?:#.*)?$/)?.[1] as ArgoResourceKind | undefined;
   }
 
   private hasClusterScopeInRefBlock(

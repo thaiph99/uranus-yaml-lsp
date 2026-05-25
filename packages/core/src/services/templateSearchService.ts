@@ -7,6 +7,7 @@ interface CachedFileContent {
 }
 
 type ReusableTemplateKind = "WorkflowTemplate" | "ClusterWorkflowTemplate";
+type ContentSearch = (content: string, filePath: string) => WorkflowTemplateLocation[];
 
 export class TemplateSearchService {
   private readonly fileCache = new Map<string, CachedFileContent>();
@@ -21,12 +22,13 @@ export class TemplateSearchService {
     clusterScope = false
   ): Promise<TemplateSearchResult> {
     const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-
-    const locations = await this.searchInFilesParallel(yamlFiles, templateName, clusterScope);
+    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+      this.searchReusableTemplateDefinitionInContent(content, filePath, templateName, clusterScope)
+    );
 
     return {
       templateName,
-      locations: locations.flat(),
+      locations,
     };
   }
 
@@ -37,17 +39,19 @@ export class TemplateSearchService {
     clusterScope = false
   ): Promise<TemplateSearchResult> {
     const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-
-    const locations = await this.searchTemplateInWorkflowTemplateFiles(
-      yamlFiles,
-      workflowTemplateName,
-      templateName,
-      clusterScope
+    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+      this.searchTemplateInWorkflowTemplateContent(
+        content,
+        filePath,
+        workflowTemplateName,
+        templateName,
+        clusterScope
+      )
     );
 
     return {
       templateName,
-      locations: locations.flat(),
+      locations,
     };
   }
 
@@ -57,16 +61,13 @@ export class TemplateSearchService {
     templateName: string
   ): Promise<TemplateSearchResult> {
     const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-
-    const locations = await this.searchTemplateInArgoResourceFiles(
-      yamlFiles,
-      resourceName,
-      templateName
+    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+      this.searchTemplateInArgoResourceContent(content, filePath, resourceName, templateName)
     );
 
     return {
       templateName,
-      locations: locations.flat(),
+      locations,
     };
   }
 
@@ -77,26 +78,28 @@ export class TemplateSearchService {
     clusterScope = false
   ): Promise<TemplateSearchResult> {
     const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-
-    const locations = await this.searchTemplateReferencesInFiles(
-      yamlFiles,
-      workflowTemplateName,
-      templateName,
-      clusterScope
+    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+      this.searchTemplateReferencesInContent(
+        content,
+        filePath,
+        workflowTemplateName,
+        templateName,
+        clusterScope
+      )
     );
-
-    const localLocations = await this.searchLocalTemplateReferencesInFiles(
-      yamlFiles,
-      workflowTemplateName,
-      templateName,
-      this.getReusableTemplateKind(clusterScope)
+    const localLocations = await this.searchFiles(yamlFiles, (content, filePath) =>
+      this.searchLocalTemplateReferencesInContent(
+        content,
+        filePath,
+        workflowTemplateName,
+        templateName,
+        this.getReusableTemplateKind(clusterScope)
+      )
     );
-
-    const flatLocations = locations.flat().concat(localLocations.flat());
 
     return {
       templateName,
-      locations: flatLocations,
+      locations: locations.concat(localLocations),
     };
   }
 
@@ -106,16 +109,13 @@ export class TemplateSearchService {
     templateName: string
   ): Promise<TemplateSearchResult> {
     const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-
-    const locations = await this.searchLocalTemplateReferencesInFiles(
-      yamlFiles,
-      resourceName,
-      templateName
+    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+      this.searchLocalTemplateReferencesInContent(content, filePath, resourceName, templateName)
     );
 
     return {
       templateName,
-      locations: locations.flat(),
+      locations,
     };
   }
 
@@ -126,17 +126,13 @@ export class TemplateSearchService {
     taskName: string
   ): Promise<TemplateSearchResult> {
     const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-
-    const locations = await this.searchDagTaskDefinitionInFiles(
-      yamlFiles,
-      resourceName,
-      templateName,
-      taskName
+    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+      this.searchDagTaskDefinitionInContent(content, filePath, resourceName, templateName, taskName)
     );
 
     return {
       templateName: taskName,
-      locations: locations.flat(),
+      locations,
     };
   }
 
@@ -147,17 +143,13 @@ export class TemplateSearchService {
     taskName: string
   ): Promise<TemplateSearchResult> {
     const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-
-    const locations = await this.searchDagTaskReferencesInFiles(
-      yamlFiles,
-      resourceName,
-      templateName,
-      taskName
+    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+      this.searchDagTaskReferencesInContent(content, filePath, resourceName, templateName, taskName)
     );
 
     return {
       templateName: taskName,
-      locations: locations.flat(),
+      locations,
     };
   }
 
@@ -167,317 +159,33 @@ export class TemplateSearchService {
     clusterScope = false
   ): Promise<TemplateSearchResult> {
     const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-
-    const locations = await this.searchWorkflowTemplateReferencesInFiles(
-      yamlFiles,
-      workflowTemplateName,
-      clusterScope
+    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+      this.searchWorkflowTemplateReferencesInContent(content, filePath, workflowTemplateName, clusterScope)
     );
-
-    const flatLocations = locations.flat();
 
     return {
       templateName: workflowTemplateName,
-      locations: flatLocations,
+      locations,
     };
   }
 
-  private async searchInFilesParallel(
-    files: string[],
-    templateName: string,
-    clusterScope: boolean
-  ): Promise<WorkflowTemplateLocation[][]> {
-    const promises: Promise<WorkflowTemplateLocation[]>[] = [];
+  private async searchFiles(files: string[], search: ContentSearch): Promise<WorkflowTemplateLocation[]> {
+    const locations: WorkflowTemplateLocation[] = [];
 
-    for (let i = 0; i < files.length; i += this.maxConcurrency) {
-      const batch = files.slice(i, i + this.maxConcurrency);
-      const batchPromises = batch.map((file) =>
-        this.searchInFile(file, templateName, clusterScope)
-      );
-      promises.push(...batchPromises);
+    for (let index = 0; index < files.length; index += this.maxConcurrency) {
+      const batch = files.slice(index, index + this.maxConcurrency);
+      const results = await Promise.all(batch.map(async (filePath) => {
+        try {
+          return search(await this.getCachedFileContent(filePath), filePath);
+        } catch {
+          return [];
+        }
+      }));
+
+      locations.push(...results.flat());
     }
 
-    return Promise.all(promises);
-  }
-
-  private async searchTemplateInWorkflowTemplateFiles(
-    files: string[],
-    workflowTemplateName: string,
-    templateName: string,
-    clusterScope: boolean
-  ): Promise<WorkflowTemplateLocation[][]> {
-    const promises: Promise<WorkflowTemplateLocation[]>[] = [];
-
-    for (let i = 0; i < files.length; i += this.maxConcurrency) {
-      const batch = files.slice(i, i + this.maxConcurrency);
-      const batchPromises = batch.map((file) =>
-        this.searchTemplateInWorkflowTemplateFile(file, workflowTemplateName, templateName, clusterScope)
-      );
-      promises.push(...batchPromises);
-    }
-
-    return Promise.all(promises);
-  }
-
-  private async searchTemplateInArgoResourceFiles(
-    files: string[],
-    resourceName: string,
-    templateName: string
-  ): Promise<WorkflowTemplateLocation[][]> {
-    const promises: Promise<WorkflowTemplateLocation[]>[] = [];
-
-    for (let i = 0; i < files.length; i += this.maxConcurrency) {
-      const batch = files.slice(i, i + this.maxConcurrency);
-      const batchPromises = batch.map((file) =>
-        this.searchTemplateInArgoResourceFile(file, resourceName, templateName)
-      );
-      promises.push(...batchPromises);
-    }
-
-    return Promise.all(promises);
-  }
-
-  private async searchTemplateReferencesInFiles(
-    files: string[],
-    workflowTemplateName: string,
-    templateName: string,
-    clusterScope: boolean
-  ): Promise<WorkflowTemplateLocation[][]> {
-    const promises: Promise<WorkflowTemplateLocation[]>[] = [];
-
-    for (let i = 0; i < files.length; i += this.maxConcurrency) {
-      const batch = files.slice(i, i + this.maxConcurrency);
-      const batchPromises = batch.map((file) =>
-        this.searchTemplateReferencesInFile(file, workflowTemplateName, templateName, clusterScope)
-      );
-      promises.push(...batchPromises);
-    }
-
-    return Promise.all(promises);
-  }
-
-  private async searchLocalTemplateReferencesInFiles(
-    files: string[],
-    resourceName: string,
-    templateName: string,
-    resourceKind?: ReusableTemplateKind
-  ): Promise<WorkflowTemplateLocation[][]> {
-    const promises: Promise<WorkflowTemplateLocation[]>[] = [];
-
-    for (let i = 0; i < files.length; i += this.maxConcurrency) {
-      const batch = files.slice(i, i + this.maxConcurrency);
-      const batchPromises = batch.map((file) =>
-        this.searchLocalTemplateReferencesInFile(file, resourceName, templateName, resourceKind)
-      );
-      promises.push(...batchPromises);
-    }
-
-    return Promise.all(promises);
-  }
-
-  private async searchDagTaskDefinitionInFiles(
-    files: string[],
-    resourceName: string,
-    templateName: string,
-    taskName: string
-  ): Promise<WorkflowTemplateLocation[][]> {
-    const promises: Promise<WorkflowTemplateLocation[]>[] = [];
-
-    for (let i = 0; i < files.length; i += this.maxConcurrency) {
-      const batch = files.slice(i, i + this.maxConcurrency);
-      const batchPromises = batch.map((file) =>
-        this.searchDagTaskDefinitionInFile(file, resourceName, templateName, taskName)
-      );
-      promises.push(...batchPromises);
-    }
-
-    return Promise.all(promises);
-  }
-
-  private async searchDagTaskReferencesInFiles(
-    files: string[],
-    resourceName: string,
-    templateName: string,
-    taskName: string
-  ): Promise<WorkflowTemplateLocation[][]> {
-    const promises: Promise<WorkflowTemplateLocation[]>[] = [];
-
-    for (let i = 0; i < files.length; i += this.maxConcurrency) {
-      const batch = files.slice(i, i + this.maxConcurrency);
-      const batchPromises = batch.map((file) =>
-        this.searchDagTaskReferencesInFile(file, resourceName, templateName, taskName)
-      );
-      promises.push(...batchPromises);
-    }
-
-    return Promise.all(promises);
-  }
-
-  private async searchWorkflowTemplateReferencesInFiles(
-    files: string[],
-    workflowTemplateName: string,
-    clusterScope: boolean
-  ): Promise<WorkflowTemplateLocation[][]> {
-    const promises: Promise<WorkflowTemplateLocation[]>[] = [];
-
-    for (let i = 0; i < files.length; i += this.maxConcurrency) {
-      const batch = files.slice(i, i + this.maxConcurrency);
-      const batchPromises = batch.map((file) =>
-        this.searchWorkflowTemplateReferencesInFile(file, workflowTemplateName, clusterScope)
-      );
-      promises.push(...batchPromises);
-    }
-
-    return Promise.all(promises);
-  }
-
-  private async searchInFile(
-    filePath: string,
-    templateName: string,
-    clusterScope: boolean
-  ): Promise<WorkflowTemplateLocation[]> {
-    try {
-      const content = await this.getCachedFileContent(filePath);
-      return this.searchInContent(content, filePath, templateName, clusterScope);
-    } catch {
-      return [];
-    }
-  }
-
-  private async searchTemplateInWorkflowTemplateFile(
-    filePath: string,
-    workflowTemplateName: string,
-    templateName: string,
-    clusterScope: boolean
-  ): Promise<WorkflowTemplateLocation[]> {
-    try {
-      const content = await this.getCachedFileContent(filePath);
-      return this.searchTemplateInWorkflowTemplateContent(
-        content,
-        filePath,
-        workflowTemplateName,
-        templateName,
-        clusterScope
-      );
-    } catch {
-      return [];
-    }
-  }
-
-  private async searchTemplateInArgoResourceFile(
-    filePath: string,
-    resourceName: string,
-    templateName: string
-  ): Promise<WorkflowTemplateLocation[]> {
-    try {
-      const content = await this.getCachedFileContent(filePath);
-      return this.searchTemplateInArgoResourceContent(
-        content,
-        filePath,
-        resourceName,
-        templateName
-      );
-    } catch {
-      return [];
-    }
-  }
-
-  private async searchTemplateReferencesInFile(
-    filePath: string,
-    workflowTemplateName: string,
-    templateName: string,
-    clusterScope: boolean
-  ): Promise<WorkflowTemplateLocation[]> {
-    try {
-      const content = await this.getCachedFileContent(filePath);
-      return this.searchTemplateReferencesInContent(
-        content,
-        filePath,
-        workflowTemplateName,
-        templateName,
-        clusterScope
-      );
-    } catch {
-      return [];
-    }
-  }
-
-  private async searchLocalTemplateReferencesInFile(
-    filePath: string,
-    resourceName: string,
-    templateName: string,
-    resourceKind?: ReusableTemplateKind
-  ): Promise<WorkflowTemplateLocation[]> {
-    try {
-      const content = await this.getCachedFileContent(filePath);
-      return this.searchLocalTemplateReferencesInContent(
-        content,
-        filePath,
-        resourceName,
-        templateName,
-        resourceKind
-      );
-    } catch {
-      return [];
-    }
-  }
-
-  private async searchDagTaskDefinitionInFile(
-    filePath: string,
-    resourceName: string,
-    templateName: string,
-    taskName: string
-  ): Promise<WorkflowTemplateLocation[]> {
-    try {
-      const content = await this.getCachedFileContent(filePath);
-      return this.searchDagTaskDefinitionInContent(
-        content,
-        filePath,
-        resourceName,
-        templateName,
-        taskName
-      );
-    } catch {
-      return [];
-    }
-  }
-
-  private async searchDagTaskReferencesInFile(
-    filePath: string,
-    resourceName: string,
-    templateName: string,
-    taskName: string
-  ): Promise<WorkflowTemplateLocation[]> {
-    try {
-      const content = await this.getCachedFileContent(filePath);
-      return this.searchDagTaskReferencesInContent(
-        content,
-        filePath,
-        resourceName,
-        templateName,
-        taskName
-      );
-    } catch {
-      return [];
-    }
-  }
-
-  private async searchWorkflowTemplateReferencesInFile(
-    filePath: string,
-    workflowTemplateName: string,
-    clusterScope: boolean
-  ): Promise<WorkflowTemplateLocation[]> {
-    try {
-      const content = await this.getCachedFileContent(filePath);
-      return this.searchWorkflowTemplateReferencesInContent(
-        content,
-        filePath,
-        workflowTemplateName,
-        clusterScope
-      );
-    } catch {
-      return [];
-    }
+    return locations;
   }
 
   private async getCachedFileContent(filePath: string): Promise<string> {
@@ -498,7 +206,7 @@ export class TemplateSearchService {
     return content;
   }
 
-  private searchInContent(
+  private searchReusableTemplateDefinitionInContent(
     content: string,
     filePath: string,
     templateName: string,
@@ -507,14 +215,14 @@ export class TemplateSearchService {
     const lines = content.split("\n");
     const locations: WorkflowTemplateLocation[] = [];
 
-    const workflowTemplateLines: number[] = [];
+    const resourceLines: number[] = [];
     for (let i = 0; i < lines.length; i++) {
       if (this.isReusableTemplateLine(lines[i], clusterScope)) {
-        workflowTemplateLines.push(i);
+        resourceLines.push(i);
       }
     }
 
-    for (const startIndex of workflowTemplateLines) {
+    for (const startIndex of resourceLines) {
       const nameLineIndex = this.findTemplateNameLine(
         lines,
         startIndex,
@@ -542,14 +250,14 @@ export class TemplateSearchService {
     const lines = content.split("\n");
     const locations: WorkflowTemplateLocation[] = [];
 
-    const workflowTemplateStart = this.findWorkflowTemplateByName(lines, workflowTemplateName, clusterScope);
-    if (workflowTemplateStart === -1) {
+    const resourceStart = this.findReusableTemplateByName(lines, workflowTemplateName, clusterScope);
+    if (resourceStart === -1) {
       return locations;
     }
 
-    const workflowTemplateEnd = this.findWorkflowTemplateEnd(lines, workflowTemplateStart);
+    const resourceEnd = this.findResourceEnd(lines, resourceStart);
 
-    const templatesSection = this.findTemplatesSection(lines, workflowTemplateStart, workflowTemplateEnd);
+    const templatesSection = this.findTemplatesSection(lines, resourceStart, resourceEnd);
     if (templatesSection === -1) {
       return locations;
     }
@@ -557,7 +265,7 @@ export class TemplateSearchService {
     const templateLocation = this.findTemplateInTemplatesSection(
       lines,
       templatesSection,
-      workflowTemplateEnd,
+      resourceEnd,
       templateName
     );
 
@@ -586,7 +294,7 @@ export class TemplateSearchService {
       return locations;
     }
 
-    const resourceEnd = this.findWorkflowTemplateEnd(lines, resourceStart);
+    const resourceEnd = this.findResourceEnd(lines, resourceStart);
     const templatesSection = this.findTemplatesSection(lines, resourceStart, resourceEnd);
     if (templatesSection === -1) {
       return locations;
@@ -704,7 +412,7 @@ export class TemplateSearchService {
       return locations;
     }
 
-    const resourceEnd = this.findWorkflowTemplateEnd(lines, resourceStart);
+    const resourceEnd = this.findResourceEnd(lines, resourceStart);
 
     for (let i = resourceStart; i < resourceEnd; i++) {
       const line = lines[i];
@@ -973,7 +681,7 @@ export class TemplateSearchService {
     startIndex: number,
     templateName: string
   ): number {
-    const resourceEnd = this.findWorkflowTemplateEnd(lines, startIndex);
+    const resourceEnd = this.findResourceEnd(lines, startIndex);
     for (let j = startIndex; j < resourceEnd; j++) {
       const line = lines[j];
       if (
@@ -1000,7 +708,7 @@ export class TemplateSearchService {
     return extractedName === templateName;
   }
 
-  private findWorkflowTemplateByName(
+  private findReusableTemplateByName(
     lines: string[],
     workflowTemplateName: string,
     clusterScope: boolean
@@ -1041,7 +749,7 @@ export class TemplateSearchService {
     return -1;
   }
 
-  private findWorkflowTemplateEnd(lines: string[], startIndex: number): number {
+  private findResourceEnd(lines: string[], startIndex: number): number {
     for (let i = startIndex + 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (line.startsWith("kind:") || (line.startsWith("apiVersion:") && lines[i-1]?.trim() === "---")) {
@@ -1095,7 +803,7 @@ export class TemplateSearchService {
       return undefined;
     }
 
-    const resourceEnd = this.findWorkflowTemplateEnd(lines, resourceStart);
+    const resourceEnd = this.findResourceEnd(lines, resourceStart);
     const templatesSection = this.findTemplatesSection(lines, resourceStart, resourceEnd);
     if (templatesSection === -1) {
       return undefined;

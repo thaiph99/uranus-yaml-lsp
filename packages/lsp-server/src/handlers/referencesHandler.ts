@@ -7,6 +7,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
   ArgoYamlNavigationTarget,
   ArgoYamlNavigationService,
+  searchTargetReferences,
   TemplateSearchService,
   TextDocumentReader,
   WorkflowTemplateLocation
@@ -26,12 +27,6 @@ class LspDocumentReader implements TextDocumentReader {
     });
   }
 
-  public getTextInRange(startLine: number, endLine: number): string {
-    return this.document.getText({
-      start: { line: startLine, character: 0 },
-      end: { line: endLine, character: 0 }
-    });
-  }
 }
 
 export class ReferencesHandler {
@@ -60,103 +55,17 @@ export class ReferencesHandler {
     return this.findReferences(target);
   }
 
-  private findReferences(target: ArgoYamlNavigationTarget): Promise<Location[]> {
-    switch (target.kind) {
-      case 'templateDefinition':
-      case 'templateReferences':
-        return this.findTemplateReferences(
-          target.workflowTemplateName,
-          target.templateName,
-          target.clusterScope ?? false
-        );
-      case 'localTemplateDefinition':
-      case 'localTemplateReferences':
-        return this.findLocalTemplateReferences(
-          target.resourceName,
-          target.templateName
-        );
-      case 'dagTaskDefinition':
-      case 'dagTaskReferences':
-        return this.findDagTaskReferences(
-          target.resourceName,
-          target.templateName,
-          target.taskName
-        );
-      case 'workflowTemplateDefinition':
-      case 'workflowTemplateReferences':
-        return this.findWorkflowTemplateReferences(target.workflowTemplateName, target.clusterScope ?? false);
-    }
-  }
-
-  private async findTemplateReferences(
-    workflowTemplateName: string,
-    templateName: string,
-    clusterScope: boolean
-  ): Promise<Location[]> {
+  private async findReferences(target: ArgoYamlNavigationTarget): Promise<Location[]> {
     try {
-      const searchResult = await this.templateSearchService.findTemplateReferences(
+      const searchResult = await searchTargetReferences(
+        this.templateSearchService,
         this.workspaceRoot,
-        workflowTemplateName,
-        templateName,
-        clusterScope
+        target
       );
 
       return this.toLocations(searchResult.locations);
     } catch (error) {
-      console.error("Error finding template references:", error);
-      return [];
-    }
-  }
-
-  private async findWorkflowTemplateReferences(templateName: string, clusterScope: boolean): Promise<Location[]> {
-    try {
-      const searchResult = await this.templateSearchService.findWorkflowTemplateReferences(
-        this.workspaceRoot,
-        templateName,
-        clusterScope
-      );
-
-      return this.toLocations(searchResult.locations);
-    } catch (error) {
-      console.error("Error finding WorkflowTemplate references:", error);
-      return [];
-    }
-  }
-
-  private async findLocalTemplateReferences(
-    resourceName: string,
-    templateName: string
-  ): Promise<Location[]> {
-    try {
-      const searchResult = await this.templateSearchService.findLocalTemplateReferences(
-        this.workspaceRoot,
-        resourceName,
-        templateName
-      );
-
-      return this.toLocations(searchResult.locations);
-    } catch (error) {
-      console.error("Error finding local template references:", error);
-      return [];
-    }
-  }
-
-  private async findDagTaskReferences(
-    resourceName: string,
-    templateName: string,
-    taskName: string
-  ): Promise<Location[]> {
-    try {
-      const searchResult = await this.templateSearchService.findDagTaskReferences(
-        this.workspaceRoot,
-        resourceName,
-        templateName,
-        taskName
-      );
-
-      return this.toLocations(searchResult.locations);
-    } catch (error) {
-      console.error('Error finding DAG task references:', error);
+      console.error('Error resolving Argo YAML references:', error);
       return [];
     }
   }

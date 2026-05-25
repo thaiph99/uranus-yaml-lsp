@@ -7,22 +7,13 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
   ArgoYamlNavigationService,
   ArgoYamlNavigationTarget,
-  TemplateSearchResult,
+  DefinitionNavigationTarget,
+  isDefinitionNavigationTarget,
+  searchTargetDefinition,
   TemplateSearchService,
   TextDocumentReader,
   WorkflowTemplateLocation
 } from '@uranus-yaml/core';
-
-type DefinitionNavigationTarget = Extract<
-  ArgoYamlNavigationTarget,
-  {
-    readonly kind:
-      | 'templateDefinition'
-      | 'localTemplateDefinition'
-      | 'dagTaskDefinition'
-      | 'workflowTemplateDefinition'
-  }
->;
 
 class LspDocumentReader implements TextDocumentReader {
   public readonly lineCount: number;
@@ -38,12 +29,6 @@ class LspDocumentReader implements TextDocumentReader {
     });
   }
 
-  public getTextInRange(startLine: number, endLine: number): string {
-    return this.document.getText({
-      start: { line: startLine, character: 0 },
-      end: { line: endLine, character: 0 }
-    });
-  }
 }
 
 export class DefinitionHandler {
@@ -70,27 +55,16 @@ export class DefinitionHandler {
       return null;
     }
 
-    if (!this.isDefinitionTarget(target)) {
+    if (!isDefinitionNavigationTarget(target)) {
       return [this.toCurrentNameLocation(params, documentReader, target)];
     }
 
     return this.findDefinitionLocations(target);
   }
 
-  private isDefinitionTarget(
-    target: ArgoYamlNavigationTarget
-  ): target is DefinitionNavigationTarget {
-    return (
-      target.kind === 'templateDefinition' ||
-      target.kind === 'localTemplateDefinition' ||
-      target.kind === 'dagTaskDefinition' ||
-      target.kind === 'workflowTemplateDefinition'
-    );
-  }
-
   private async findDefinitionLocations(target: DefinitionNavigationTarget): Promise<Location[]> {
     try {
-      const searchResult = await this.searchDefinitions(target);
+      const searchResult = await searchTargetDefinition(this.templateSearchService, this.workspaceRoot, target);
       return this.toLocations(searchResult.locations);
     } catch (error) {
       console.error("Error resolving Argo YAML definition:", error);
@@ -146,37 +120,6 @@ export class DefinitionHandler {
     }
 
     return match.index + characterInMatch;
-  }
-
-  private searchDefinitions(target: DefinitionNavigationTarget): Promise<TemplateSearchResult> {
-    switch (target.kind) {
-      case 'templateDefinition':
-        return this.templateSearchService.findTemplateInWorkflowTemplate(
-          this.workspaceRoot,
-          target.workflowTemplateName,
-          target.templateName,
-          target.clusterScope ?? false
-        );
-      case 'localTemplateDefinition':
-        return this.templateSearchService.findTemplateInArgoResource(
-          this.workspaceRoot,
-          target.resourceName,
-          target.templateName
-        );
-      case 'dagTaskDefinition':
-        return this.templateSearchService.findDagTaskDefinition(
-          this.workspaceRoot,
-          target.resourceName,
-          target.templateName,
-          target.taskName
-        );
-      case 'workflowTemplateDefinition':
-        return this.templateSearchService.findTemplateDefinition(
-          this.workspaceRoot,
-          target.workflowTemplateName,
-          target.clusterScope ?? false
-        );
-    }
   }
 
   private toLocations(locations: readonly WorkflowTemplateLocation[]): Location[] {

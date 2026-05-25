@@ -2,6 +2,10 @@ import * as vscode from "vscode";
 import {
   ArgoYamlNavigationService,
   ArgoYamlNavigationTarget,
+  DefinitionNavigationTarget,
+  isDefinitionNavigationTarget,
+  searchTargetDefinition,
+  searchTargetReferences,
   TemplateSearchService,
   TextDocumentReader,
   WorkflowTemplateLocation
@@ -18,11 +22,6 @@ class VsCodeDocumentReader implements TextDocumentReader {
     return this.document.lineAt(line).text;
   }
 
-  public getTextInRange(startLine: number, endLine: number): string {
-    return this.document.getText(
-      new vscode.Range(startLine, 0, endLine, 0)
-    );
-  }
 }
 
 export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider, vscode.ReferenceProvider {
@@ -54,7 +53,7 @@ export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider, vs
       return undefined;
     }
 
-    if (target.kind.endsWith("References")) {
+    if (!isDefinitionNavigationTarget(target)) {
       return new vscode.Location(document.uri, position);
     }
 
@@ -89,11 +88,11 @@ export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider, vs
 
   private async findLocations(
     rootPath: string,
-    target: ArgoYamlNavigationTarget,
+    target: DefinitionNavigationTarget,
     token: vscode.CancellationToken
   ): Promise<vscode.Location[] | undefined> {
     try {
-      const searchResult = await this.search(rootPath, target);
+      const searchResult = await searchTargetDefinition(this.templateSearchService, rootPath, target);
       if (token.isCancellationRequested || searchResult.locations.length === 0) {
         return undefined;
       }
@@ -111,7 +110,7 @@ export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider, vs
     token: vscode.CancellationToken
   ): Promise<vscode.Location[] | undefined> {
     try {
-      const searchResult = await this.searchReferences(rootPath, target);
+      const searchResult = await searchTargetReferences(this.templateSearchService, rootPath, target);
       if (token.isCancellationRequested || searchResult.locations.length === 0) {
         return undefined;
       }
@@ -120,98 +119,6 @@ export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider, vs
     } catch (error) {
       console.error("Error finding Argo YAML references:", error);
       return undefined;
-    }
-  }
-
-  private search(rootPath: string, target: ArgoYamlNavigationTarget) {
-    switch (target.kind) {
-      case "templateDefinition":
-        return this.templateSearchService.findTemplateInWorkflowTemplate(
-          rootPath,
-          target.workflowTemplateName,
-          target.templateName,
-          target.clusterScope ?? false
-        );
-      case "localTemplateDefinition":
-        return this.templateSearchService.findTemplateInArgoResource(
-          rootPath,
-          target.resourceName,
-          target.templateName
-        );
-      case "dagTaskDefinition":
-        return this.templateSearchService.findDagTaskDefinition(
-          rootPath,
-          target.resourceName,
-          target.templateName,
-          target.taskName
-        );
-      case "workflowTemplateDefinition":
-        return this.templateSearchService.findTemplateDefinition(
-          rootPath,
-          target.workflowTemplateName,
-          target.clusterScope ?? false
-        );
-      case "templateReferences":
-        return this.templateSearchService.findTemplateReferences(
-          rootPath,
-          target.workflowTemplateName,
-          target.templateName,
-          target.clusterScope ?? false
-        );
-      case "localTemplateReferences":
-        return this.templateSearchService.findLocalTemplateReferences(
-          rootPath,
-          target.resourceName,
-          target.templateName
-        );
-      case "dagTaskReferences":
-        return this.templateSearchService.findDagTaskReferences(
-          rootPath,
-          target.resourceName,
-          target.templateName,
-          target.taskName
-        );
-      case "workflowTemplateReferences":
-        return this.templateSearchService.findWorkflowTemplateReferences(
-          rootPath,
-          target.workflowTemplateName,
-          target.clusterScope ?? false
-        );
-    }
-  }
-
-  private searchReferences(rootPath: string, target: ArgoYamlNavigationTarget) {
-    switch (target.kind) {
-      case "templateDefinition":
-      case "templateReferences":
-        return this.templateSearchService.findTemplateReferences(
-          rootPath,
-          target.workflowTemplateName,
-          target.templateName,
-          target.clusterScope ?? false
-        );
-      case "localTemplateDefinition":
-      case "localTemplateReferences":
-        return this.templateSearchService.findLocalTemplateReferences(
-          rootPath,
-          target.resourceName,
-          target.templateName
-        );
-      case "dagTaskDefinition":
-      case "dagTaskReferences":
-        return this.templateSearchService.findDagTaskReferences(
-          rootPath,
-          target.resourceName,
-          target.templateName,
-          target.taskName
-        );
-      case "workflowTemplateDefinition":
-      case "workflowTemplateReferences":
-        return this.templateSearchService.findWorkflowTemplateReferences(
-          rootPath,
-          target.workflowTemplateName,
-          target.clusterScope ?? false
-        );
     }
   }
 
