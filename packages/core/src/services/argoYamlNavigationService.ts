@@ -7,6 +7,7 @@ import {
   isArgoResourceLine,
   isReusableTemplateKind
 } from "./argoYamlSyntax";
+import { findDagDependencyTaskAtPosition } from "./dagDependencySyntax";
 
 export interface DocumentPosition {
   readonly line: number;
@@ -248,9 +249,7 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    const taskName = currentLine.includes("depends:")
-      ? this.extractDependsTokenAtPosition(currentLine, position.character)
-      : this.extractDependencyTokenAtPosition(currentLine, position.character);
+    const taskName = findDagDependencyTaskAtPosition(currentLine, position.character);
     if (!taskName) {
       return undefined;
     }
@@ -388,53 +387,6 @@ export class ArgoYamlNavigationService {
     }
 
     return undefined;
-  }
-
-  private extractDependencyTokenAtPosition(line: string, character: number): string | undefined {
-    const tokenRanges = this.getTokenRanges(line, /[A-Za-z0-9_-]+/g);
-    const filteredRanges = line.includes("dependencies:")
-      ? tokenRanges.filter((range) => range.value !== "dependencies")
-      : tokenRanges;
-
-    return this.findTokenAtPosition(filteredRanges, character);
-  }
-
-  private extractDependsTokenAtPosition(line: string, character: number): string | undefined {
-    const tokenRanges = this.getTokenRanges(line, /[A-Za-z0-9_-]+(?:\.[A-Za-z]+)?/g)
-      .filter((range) => range.value !== "depends")
-      .map((range) => {
-        const taskName = range.value.match(/^([A-Za-z0-9_-]+)/)?.[1];
-        return {
-          start: range.start,
-          end: range.start + (taskName?.length ?? range.value.length),
-          value: taskName ?? range.value
-        };
-      });
-
-    return this.findTokenAtPosition(tokenRanges, character);
-  }
-
-  private getTokenRanges(
-    line: string,
-    pattern: RegExp
-  ): Array<{ start: number; end: number; value: string }> {
-    const ranges: Array<{ start: number; end: number; value: string }> = [];
-    for (const match of line.matchAll(pattern)) {
-      if (match.index === undefined) {
-        continue;
-      }
-
-      ranges.push({ start: match.index, end: match.index + match[0].length, value: match[0] });
-    }
-
-    return ranges;
-  }
-
-  private findTokenAtPosition(
-    tokenRanges: Array<{ start: number; end: number; value: string }>,
-    character: number
-  ): string | undefined {
-    return tokenRanges.find((range) => character >= range.start && character < range.end)?.value;
   }
 
   private getTemplateRefContext(

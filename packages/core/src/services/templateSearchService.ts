@@ -8,6 +8,11 @@ import {
   NavigationKey,
   ReusableTemplateKind
 } from "./argoYamlSyntax";
+import {
+  findDagDependencyRanges,
+  findMultilineDependenciesEnd,
+  isMultilineDependenciesLine
+} from "./dagDependencySyntax";
 import { FileSystemService } from "./fileSystemService";
 
 interface CachedFileContent {
@@ -477,7 +482,7 @@ export class TemplateSearchService {
 
     for (let i = dagTasksSection.tasksStart + 1; i < dagTasksSection.tasksEnd; i++) {
       const line = lines[i];
-      const dependencyRanges = this.findDagDependencyReferenceRanges(
+      const dependencyRanges = findDagDependencyRanges(
         lines,
         i,
         dagTasksSection.tasksEnd,
@@ -493,8 +498,8 @@ export class TemplateSearchService {
         });
       }
 
-      if (/^\s*dependencies:\s*$/.test(line)) {
-        i = this.skipMultilineDependencies(lines, i, dagTasksSection.tasksEnd);
+      if (isMultilineDependenciesLine(line)) {
+        i = findMultilineDependenciesEnd(lines, i, dagTasksSection.tasksEnd);
       }
     }
 
@@ -776,188 +781,6 @@ export class TemplateSearchService {
     }
 
     return maxEnd;
-  }
-
-  private findDagDependencyReferenceRanges(
-    lines: string[],
-    lineIndex: number,
-    tasksEnd: number,
-    taskName: string
-  ): { line: number; character: number; endCharacter: number }[] {
-    const line = lines[lineIndex];
-
-    if (/^\s*dependencies:\s*\[/.test(line)) {
-      return this.findInlineDependencyRanges(line, lineIndex, taskName);
-    }
-
-    if (/^\s*dependencies:\s*$/.test(line)) {
-      return this.findMultilineDependencyRanges(lines, lineIndex, tasksEnd, taskName);
-    }
-
-    if (/^\s*depends:\s*/.test(line)) {
-      return this.findDependsExpressionRanges(line, lineIndex, taskName);
-    }
-
-    return [];
-  }
-
-  private findInlineDependencyRanges(
-    line: string,
-    lineIndex: number,
-    taskName: string
-  ): { line: number; character: number; endCharacter: number }[] {
-    const ranges: { line: number; character: number; endCharacter: number }[] = [];
-    const listStart = line.indexOf("[");
-    const listEnd = line.indexOf("]", listStart + 1);
-    if (listStart === -1 || listEnd === -1) {
-      return ranges;
-    }
-
-    const listContent = line.slice(listStart + 1, listEnd);
-    const dependencyPattern = /['"]?([A-Za-z0-9_-]+)['"]?/g;
-    let match: RegExpExecArray | null;
-
-    while ((match = dependencyPattern.exec(listContent)) !== null) {
-      if (match[1] !== taskName || match.index === undefined) {
-        continue;
-      }
-
-      const character = listStart + 1 + match.index + match[0].indexOf(taskName);
-      ranges.push({
-        line: lineIndex,
-        character,
-        endCharacter: character + taskName.length,
-      });
-    }
-
-    return ranges;
-  }
-
-  private findMultilineDependencyRanges(
-    lines: string[],
-    dependenciesLine: number,
-    tasksEnd: number,
-    taskName: string
-  ): { line: number; character: number; endCharacter: number }[] {
-    const ranges: { line: number; character: number; endCharacter: number }[] = [];
-    const dependenciesIndent = getIndent(lines[dependenciesLine]);
-
-    for (let i = dependenciesLine + 1; i < tasksEnd; i++) {
-      const line = lines[i];
-      if (line.trim() === "") {
-        continue;
-      }
-
-      if (getIndent(line) <= dependenciesIndent) {
-        break;
-      }
-
-      const itemMatch = line.match(/^\s*-\s*['"]?([^'"#\s\]]+)['"]?\s*(?:#.*)?$/);
-      if (!itemMatch || itemMatch[1] !== taskName) {
-        continue;
-      }
-
-      const character = line.indexOf(taskName);
-      ranges.push({
-        line: i,
-        character,
-        endCharacter: character + taskName.length,
-      });
-    }
-
-    return ranges;
-  }
-
-  private findDependsExpressionRanges(
-    line: string,
-    lineIndex: number,
-    taskName: string
-  ): { line: number; character: number; endCharacter: number }[] {
-    const ranges: { line: number; character: number; endCharacter: number }[] = [];
-    const colonIndex = line.indexOf(":");
-    if (colonIndex === -1) {
-      return ranges;
-    }
-
-    const valueStart = colonIndex + 1;
-    const value = line.slice(valueStart);
-    let tokenStart = -1;
-    let inSingleQuote = false;
-    let inDoubleQuote = false;
-
-    const pushToken = (tokenEnd: number): void => {
-      if (tokenStart === -1) {
-        return;
-      }
-
-      const token = value.slice(tokenStart, tokenEnd);
-      const taskNamePrefix = token.split(".", 1)[0];
-      if (taskNamePrefix === taskName) {
-        const character = valueStart + tokenStart;
-        ranges.push({
-          line: lineIndex,
-          character,
-          endCharacter: character + taskName.length,
-        });
-      }
-
-      tokenStart = -1;
-    };
-
-    for (let i = 0; i < value.length; i++) {
-      const character = value[i];
-
-      if (!inSingleQuote && !inDoubleQuote && character === "#") {
-        pushToken(i);
-        break;
-      }
-
-      if (character === "'" && !inDoubleQuote) {
-        pushToken(i);
-        inSingleQuote = !inSingleQuote;
-        continue;
-      }
-
-      if (character === '"' && !inSingleQuote) {
-        pushToken(i);
-        inDoubleQuote = !inDoubleQuote;
-        continue;
-      }
-
-      if (this.isDependsTokenCharacter(character)) {
-        if (tokenStart === -1) {
-          tokenStart = i;
-        }
-        continue;
-      }
-
-      pushToken(i);
-    }
-
-    pushToken(value.length);
-
-    return ranges;
-  }
-
-  private isDependsTokenCharacter(character: string): boolean {
-    return /[A-Za-z0-9_\.-]/.test(character);
-  }
-
-  private skipMultilineDependencies(lines: string[], dependenciesLine: number, tasksEnd: number): number {
-    const dependenciesIndent = getIndent(lines[dependenciesLine]);
-
-    for (let i = dependenciesLine + 1; i < tasksEnd; i++) {
-      const line = lines[i];
-      if (line.trim() === "") {
-        continue;
-      }
-
-      if (getIndent(line) <= dependenciesIndent) {
-        return i - 1;
-      }
-    }
-
-    return tasksEnd - 1;
   }
 
   private getLocalTemplateCallKey(
