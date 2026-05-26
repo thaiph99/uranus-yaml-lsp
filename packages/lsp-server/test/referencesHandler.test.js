@@ -127,7 +127,7 @@ test('gr on a DAG task name searches DAG task references', async () => {
       uri: 'file:///workspace/dag-dependencies.yaml',
       range: {
         start: { line: 22, character: 22 },
-        end: { line: 22, character: 22 },
+        end: { line: 22, character: 23 },
       },
     },
   ]);
@@ -168,7 +168,7 @@ spec:
       uri: 'file:///workspace/workflow.yaml',
       range: {
         start: { line: 12, character: 20 },
-        end: { line: 12, character: 20 },
+        end: { line: 12, character: 34 },
       },
     },
   ]);

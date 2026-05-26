@@ -203,7 +203,7 @@ spec:
       uri,
       range: {
         start: { line: 7, character: 12 },
-        end: { line: 7, character: 12 },
+        end: { line: 7, character: 16 },
       },
     },
   ]);
@@ -269,7 +269,7 @@ spec:
       uri: 'file:///workspace/tem1.yaml',
       range: {
         start: { line: 3, character: 8 },
-        end: { line: 3, character: 8 },
+        end: { line: 3, character: 16 },
       },
     },
   ]);
@@ -316,7 +316,7 @@ spec:
       uri: 'file:///workspace/cluster-library.yaml',
       range: {
         start: { line: 6, character: 12 },
-        end: { line: 6, character: 12 },
+        end: { line: 6, character: 17 },
       },
     },
   ]);
@@ -383,7 +383,7 @@ test('gd on DAG dependency token searches DAG task definitions', async () => {
       uri: 'file:///workspace/dag-dependencies.yaml',
       range: {
         start: { line: 10, character: 18 },
-        end: { line: 10, character: 18 },
+        end: { line: 10, character: 19 },
       },
     },
   ]);

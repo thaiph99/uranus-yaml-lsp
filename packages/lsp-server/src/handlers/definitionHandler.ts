@@ -11,25 +11,9 @@ import {
   isDefinitionNavigationTarget,
   searchTargetDefinition,
   TemplateSearchService,
-  TextDocumentReader,
-  WorkflowTemplateLocation
+  TextDocumentReader
 } from '@uranus-yaml/core';
-
-class LspDocumentReader implements TextDocumentReader {
-  public readonly lineCount: number;
-
-  constructor(private readonly document: TextDocument) {
-    this.lineCount = document.lineCount;
-  }
-
-  public getLine(line: number): string {
-    return this.document.getText({
-      start: { line, character: 0 },
-      end: { line, character: Number.MAX_VALUE }
-    });
-  }
-
-}
+import { LspDocumentReader, toLspLocations } from './lspNavigationAdapter';
 
 export class DefinitionHandler {
   constructor(
@@ -65,7 +49,7 @@ export class DefinitionHandler {
   private async findDefinitionLocations(target: DefinitionNavigationTarget): Promise<Location[]> {
     try {
       const searchResult = await searchTargetDefinition(this.templateSearchService, this.workspaceRoot, target);
-      return this.toLocations(searchResult.locations);
+      return toLspLocations(searchResult.locations);
     } catch (error) {
       console.error("Error resolving Argo YAML definition:", error);
       return [];
@@ -120,15 +104,5 @@ export class DefinitionHandler {
     }
 
     return match.index + characterInMatch;
-  }
-
-  private toLocations(locations: readonly WorkflowTemplateLocation[]): Location[] {
-    return locations.map((location) => ({
-      uri: `file://${location.file}`,
-      range: {
-        start: { line: location.line, character: location.character },
-        end: { line: location.line, character: location.character }
-      }
-    }));
   }
 }
