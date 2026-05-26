@@ -1,4 +1,3 @@
-import { TemplateRefContext } from "../types";
 import {
   extractNavigationValue,
   getIndent,
@@ -68,11 +67,6 @@ export type ArgoYamlNavigationTarget =
       readonly clusterScope?: true;
     };
 
-export interface TemplateReferenceContext {
-  readonly workflowTemplateName: string;
-  readonly templateName: string;
-}
-
 interface LocalTemplateContext {
   readonly resource: ArgoResourceContext;
   readonly templateName: string;
@@ -81,6 +75,12 @@ interface LocalTemplateContext {
 interface ReusableTemplateCallContext {
   readonly workflowTemplateName: string | undefined;
   readonly templateName: string | undefined;
+  readonly clusterScope?: true;
+}
+
+interface TemplateRefContext {
+  readonly workflowTemplateName: string;
+  readonly templateName: string;
   readonly clusterScope?: true;
 }
 
@@ -170,30 +170,6 @@ export class ArgoYamlNavigationService {
     }
 
     return undefined;
-  }
-
-  public getTemplateReferenceContext(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): TemplateReferenceContext | undefined {
-    const templateName = this.getNameAtPosition(document, position);
-    if (!templateName) {
-      return undefined;
-    }
-
-    const resourceName = getContainingArgoResource(document, position)?.name;
-    if (!resourceName) {
-      return undefined;
-    }
-
-    return { workflowTemplateName: resourceName, templateName };
-  }
-
-  public getWorkflowTemplateNameAtPosition(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): string | undefined {
-    return this.getNameAtPosition(document, position);
   }
 
   private isNameReference(line: string): boolean {
