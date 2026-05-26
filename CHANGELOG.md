@@ -12,6 +12,7 @@ All notable changes to the "uranus-yaml-lsp" extension will be documented in thi
 
 ### Changed
 - Split cursor context lookup, YAML structure traversal, content-level location matching, and DAG dependency parsing out of target classification and workspace scan orchestration to clarify core navigation responsibilities.
+- Consolidated workspace file caching so editor lifecycle disposal clears the cache used for navigation searches.
 
 ## [1.0.2] - 2026-05-17
 
