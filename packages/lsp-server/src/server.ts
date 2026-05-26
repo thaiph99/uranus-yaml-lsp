@@ -11,7 +11,8 @@ import {
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { FileSystemService, TemplateSearchService } from '@uranus-yaml/core';
+import { FileSystemService, TemplateSearchService, WorkspaceCacheService } from '@uranus-yaml/core';
+import { cacheOpenDocument, getDocumentFilePath, removeClosedDocument } from './documentCacheSync';
 import { DefinitionHandler, ReferencesHandler } from './handlers';
 
 const connection = createConnection(ProposedFeatures.all);
@@ -24,6 +25,7 @@ let workspaceRoot = '';
 
 // Core services
 let fileSystemService: FileSystemService;
+let workspaceCacheService: WorkspaceCacheService;
 let templateSearchService: TemplateSearchService;
 let definitionHandler: DefinitionHandler;
 let referencesHandler: ReferencesHandler;
@@ -40,16 +42,17 @@ connection.onInitialize((params: InitializeParams) => {
 
   // Get workspace root
   if (params.workspaceFolders && params.workspaceFolders.length > 0) {
-    workspaceRoot = params.workspaceFolders[0].uri.replace('file://', '');
+    workspaceRoot = getDocumentFilePath(params.workspaceFolders[0].uri) ?? '';
   } else if (params.rootUri) {
-    workspaceRoot = params.rootUri.replace('file://', '');
+    workspaceRoot = getDocumentFilePath(params.rootUri) ?? '';
   } else if (params.rootPath) {
     workspaceRoot = params.rootPath;
   }
 
   // Initialize services
   fileSystemService = new FileSystemService();
-  templateSearchService = new TemplateSearchService(fileSystemService);
+  workspaceCacheService = new WorkspaceCacheService();
+  templateSearchService = new TemplateSearchService(fileSystemService, workspaceCacheService);
   definitionHandler = new DefinitionHandler(templateSearchService, documents, workspaceRoot);
   referencesHandler = new ReferencesHandler(templateSearchService, documents, workspaceRoot);
 
@@ -104,8 +107,16 @@ connection.onDidChangeConfiguration(_change => {
 });
 
 // Handle document changes
-documents.onDidChangeContent(_change => {
-  // Placeholder for document change handling
+documents.onDidOpen((change) => {
+  cacheOpenDocument(workspaceCacheService, change.document);
+});
+
+documents.onDidChangeContent((change) => {
+  cacheOpenDocument(workspaceCacheService, change.document);
+});
+
+documents.onDidClose((change) => {
+  removeClosedDocument(workspaceCacheService, change.document);
 });
 
 // Make the text document manager listen on the connection

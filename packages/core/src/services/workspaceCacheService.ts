@@ -27,6 +27,10 @@ export class WorkspaceCacheService {
     }
   }
 
+  public delete(key: string): void {
+    this.cache.delete(key);
+  }
+
   public clear(): void {
     this.cache.clear();
   }

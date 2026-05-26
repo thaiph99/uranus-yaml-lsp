@@ -4,13 +4,13 @@ import {
   TextDocuments
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { fileURLToPath } from 'node:url';
 import {
   ArgoYamlNavigationTarget,
   ArgoYamlNavigationService,
   searchTargetReferences,
   TemplateSearchService
 } from '@uranus-yaml/core';
+import { getDocumentFilePath } from '../documentCacheSync';
 import { LspDocumentReader, toLspLocations } from './lspNavigationAdapter';
 
 export class ReferencesHandler {
@@ -36,11 +36,7 @@ export class ReferencesHandler {
       return [];
     }
 
-    const sourceFilePath = document.uri.startsWith('file:')
-      ? fileURLToPath(document.uri)
-      : undefined;
-
-    return this.findReferences(target, sourceFilePath);
+    return this.findReferences(target, getDocumentFilePath(document.uri));
   }
 
   private async findReferences(
