@@ -18,6 +18,10 @@ import type {
   TextDocumentReader
 } from "./argoYamlDocumentContext";
 import { findDagDependencyTaskAtPosition } from "./dagDependencySyntax";
+import {
+  getNavigationValueAtPosition,
+  isNavigationCandidateLine
+} from "./argoYamlCursorSyntax";
 
 export type { DocumentPosition, TextDocumentReader } from "./argoYamlDocumentContext";
 
@@ -90,7 +94,7 @@ export class ArgoYamlNavigationService {
     position: DocumentPosition
   ): ArgoYamlNavigationTarget | undefined {
     const line = document.getLine(position.line);
-    if (!this.isNameReference(line)) {
+    if (!isNavigationCandidateLine(line)) {
       return undefined;
     }
 
@@ -172,18 +176,6 @@ export class ArgoYamlNavigationService {
     return undefined;
   }
 
-  private isNameReference(line: string): boolean {
-    return (
-      line.includes("name:") ||
-      line.includes("template:") ||
-      line.includes("entrypoint:") ||
-      line.includes("onExit:") ||
-      line.includes("depends:") ||
-      line.includes("dependencies:") ||
-      /^\s*-\s*[A-Za-z0-9_-]+/.test(line)
-    );
-  }
-
   private getDagTaskDefinitionContext(
     document: TextDocumentReader,
     position: DocumentPosition
@@ -202,7 +194,7 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    const taskName = this.getNameAtPosition(document, position);
+    const taskName = getNavigationValueAtPosition(document, position);
     const templateName = getContainingTemplateName(document, position);
     const resourceName = getContainingArgoResource(document, position)?.name;
     if (!taskName || !templateName || !resourceName) {
@@ -331,54 +323,6 @@ export class ArgoYamlNavigationService {
     };
   }
 
-  private getNameAtPosition(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): string | undefined {
-    const line = document.getLine(position.line);
-    const wordAtPosition = this.getWordAtPosition(line, position.character);
-    if (wordAtPosition) {
-      return wordAtPosition;
-    }
-
-    if (this.hasNavigationValue(line)) {
-      return extractNavigationValue(line);
-    }
-
-    return undefined;
-  }
-
-  private getWordAtPosition(line: string, character: number): string | undefined {
-    const wordStart = this.findWordStart(line, character);
-    const wordEnd = this.findWordEnd(line, character);
-
-    if (wordStart === wordEnd) {
-      return undefined;
-    }
-
-    const word = line.substring(wordStart, wordEnd);
-    return word.length > 0 && /[\w-]/.test(word) ? word : undefined;
-  }
-
-  private findWordStart(line: string, character: number): number {
-    const startCharacter = Math.min(character, line.length - 1);
-    for (let index = startCharacter; index >= 0; index--) {
-      if (!/[\w-]/.test(line[index])) {
-        return index + 1;
-      }
-    }
-    return 0;
-  }
-
-  private findWordEnd(line: string, character: number): number {
-    for (let index = Math.max(0, character); index < line.length; index++) {
-      if (!/[\w-]/.test(line[index])) {
-        return index;
-      }
-    }
-    return line.length;
-  }
-
   private getWorkflowTemplateRefName(
     document: TextDocumentReader,
     position: DocumentPosition
@@ -390,7 +334,7 @@ export class ArgoYamlNavigationService {
 
     const ref = this.getReusableTemplateCallContext(document, position, "templateRef") ??
       this.getReusableTemplateCallContext(document, position, "workflowTemplateRef");
-    const workflowTemplateName = this.getNameAtPosition(document, position);
+    const workflowTemplateName = getNavigationValueAtPosition(document, position);
     if (!ref?.workflowTemplateName || ref.workflowTemplateName !== workflowTemplateName) {
       return undefined;
     }
@@ -414,7 +358,7 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    const templateName = this.getNameAtPosition(document, position);
+    const templateName = getNavigationValueAtPosition(document, position);
     const resource = getContainingArgoResource(document, position);
 
     if (!templateName || !resource) {
@@ -453,7 +397,7 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    const templateName = this.getNameAtPosition(document, position);
+    const templateName = getNavigationValueAtPosition(document, position);
     const resource = getContainingArgoResource(document, position);
     if (!templateName || !resource) {
       return undefined;
@@ -476,16 +420,6 @@ export class ArgoYamlNavigationService {
     }
 
     return findReferenceBlockLine(document, position, "templateRef") === undefined;
-  }
-
-  private hasNavigationValue(line: string): boolean {
-    return (
-      line.includes("name:") ||
-      line.includes("template:") ||
-      line.includes("entrypoint:") ||
-      line.includes("onExit:") ||
-      line.includes("generateName:")
-    );
   }
 
 }
