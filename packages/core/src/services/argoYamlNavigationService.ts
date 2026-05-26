@@ -1,23 +1,26 @@
 import { TemplateRefContext } from "../types";
 import {
-  ArgoResourceKind,
   extractNavigationValue,
-  getArgoResourceKind,
   getIndent,
-  isArgoResourceLine,
   isReusableTemplateKind
 } from "./argoYamlSyntax";
+import {
+  findContainingDagTasksSection,
+  findReferenceBlockLine,
+  getContainingArgoResource,
+  getContainingTemplateName,
+  isDirectTemplateDefinition,
+  isInReusableTemplateMetadata
+} from "./argoYamlDocumentContext";
+import type {
+  ArgoResourceContext,
+  DocumentPosition,
+  ReusableTemplateRefKey,
+  TextDocumentReader
+} from "./argoYamlDocumentContext";
 import { findDagDependencyTaskAtPosition } from "./dagDependencySyntax";
 
-export interface DocumentPosition {
-  readonly line: number;
-  readonly character: number;
-}
-
-export interface TextDocumentReader {
-  readonly lineCount: number;
-  getLine(line: number): string;
-}
+export type { DocumentPosition, TextDocumentReader } from "./argoYamlDocumentContext";
 
 export type ArgoYamlNavigationTarget =
   | {
@@ -70,17 +73,10 @@ export interface TemplateReferenceContext {
   readonly templateName: string;
 }
 
-interface ArgoResourceContext {
-  readonly kind: ArgoResourceKind;
-  readonly name: string;
-}
-
 interface LocalTemplateContext {
   readonly resource: ArgoResourceContext;
   readonly templateName: string;
 }
-
-type ReusableTemplateRefKey = "templateRef" | "workflowTemplateRef";
 
 interface ReusableTemplateCallContext {
   readonly workflowTemplateName: string | undefined;
@@ -185,7 +181,7 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    const resourceName = this.getContainingArgoResource(document, position)?.name;
+    const resourceName = getContainingArgoResource(document, position)?.name;
     if (!resourceName) {
       return undefined;
     }
@@ -221,7 +217,7 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    const dagTasksLineIndex = this.findContainingDagTasksSection(document, position);
+    const dagTasksLineIndex = findContainingDagTasksSection(document, position);
     if (dagTasksLineIndex === -1) {
       return undefined;
     }
@@ -231,8 +227,8 @@ export class ArgoYamlNavigationService {
     }
 
     const taskName = this.getNameAtPosition(document, position);
-    const templateName = this.getContainingTemplateName(document, position);
-    const resourceName = this.getContainingArgoResource(document, position)?.name;
+    const templateName = getContainingTemplateName(document, position);
+    const resourceName = getContainingArgoResource(document, position)?.name;
     if (!taskName || !templateName || !resourceName) {
       return undefined;
     }
@@ -254,13 +250,13 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    const dagTasksLineIndex = this.findContainingDagTasksSection(document, position);
+    const dagTasksLineIndex = findContainingDagTasksSection(document, position);
     if (dagTasksLineIndex === -1) {
       return undefined;
     }
 
-    const templateName = this.getContainingTemplateName(document, position);
-    const resourceName = this.getContainingArgoResource(document, position)?.name;
+    const templateName = getContainingTemplateName(document, position);
+    const resourceName = getContainingArgoResource(document, position)?.name;
     if (!templateName || !resourceName) {
       return undefined;
     }
@@ -299,96 +295,6 @@ export class ArgoYamlNavigationService {
     return false;
   }
 
-  private findContainingDagTasksSection(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): number {
-    const positionIndent = getIndent(document.getLine(position.line));
-
-    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
-      const line = document.getLine(lineIndex);
-      if (!/^\s*tasks:\s*(?:#.*)?$/.test(line)) {
-        continue;
-      }
-
-      const tasksIndent = getIndent(line);
-      if (position.line !== lineIndex && positionIndent <= tasksIndent) {
-        continue;
-      }
-
-      if (this.hasSectionBoundaryBetween(document, lineIndex, position.line, tasksIndent)) {
-        continue;
-      }
-
-      if (this.isDagTasksSection(document, lineIndex)) {
-        return lineIndex;
-      }
-    }
-
-    return -1;
-  }
-
-  private hasSectionBoundaryBetween(
-    document: TextDocumentReader,
-    startLine: number,
-    endLine: number,
-    sectionIndent: number
-  ): boolean {
-    for (let lineIndex = startLine + 1; lineIndex < endLine; lineIndex++) {
-      const line = document.getLine(lineIndex);
-      if (line.trim().length === 0 || /^\s*#/.test(line)) {
-        continue;
-      }
-
-      if (getIndent(line) <= sectionIndent) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private isDagTasksSection(document: TextDocumentReader, tasksLineIndex: number): boolean {
-    const tasksIndent = getIndent(document.getLine(tasksLineIndex));
-
-    for (let lineIndex = tasksLineIndex - 1; lineIndex >= 0; lineIndex--) {
-      const line = document.getLine(lineIndex);
-      if (line.trim().length === 0) {
-        continue;
-      }
-
-      const indent = getIndent(line);
-      if (indent >= tasksIndent) {
-        continue;
-      }
-
-      return /^\s*dag:\s*(?:#.*)?$/.test(line);
-    }
-
-    return false;
-  }
-
-  private getContainingTemplateName(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): string | undefined {
-    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
-      const line = document.getLine(lineIndex);
-      if (lineIndex < position.line && isArgoResourceLine(line)) {
-        return undefined;
-      }
-      if (!/^\s*-\s+name:\s*(.+)$/.test(line)) {
-        continue;
-      }
-
-      if (this.isDirectTemplateDefinition(document, { line: lineIndex, character: line.indexOf("name:") + 6 })) {
-        return extractNavigationValue(line);
-      }
-    }
-
-    return undefined;
-  }
-
   private getTemplateRefContext(
     document: TextDocumentReader,
     position: DocumentPosition
@@ -415,7 +321,7 @@ export class ArgoYamlNavigationService {
     position: DocumentPosition,
     key: ReusableTemplateRefKey
   ): ReusableTemplateCallContext | undefined {
-    const blockLine = this.findReferenceBlockLine(document, position, key);
+    const blockLine = findReferenceBlockLine(document, position, key);
     if (blockLine === undefined) {
       return undefined;
     }
@@ -519,28 +425,6 @@ export class ArgoYamlNavigationService {
     };
   }
 
-  private findReferenceBlockLine(
-    document: TextDocumentReader,
-    position: DocumentPosition,
-    key: ReusableTemplateRefKey
-  ): number | undefined {
-    const startLine = Math.max(0, position.line - 15);
-    const valueIndent = getIndent(document.getLine(position.line));
-    const blockPattern = new RegExp(`^\\s*${key}:\\s*(?:#.*)?$`);
-
-    for (let lineIndex = position.line; lineIndex >= startLine; lineIndex--) {
-      const line = document.getLine(lineIndex);
-      const blockIndent = getIndent(line);
-      if (blockPattern.test(line) &&
-          blockIndent < valueIndent &&
-          !this.hasSectionBoundaryBetween(document, lineIndex, position.line, blockIndent)) {
-        return lineIndex;
-      }
-    }
-
-    return undefined;
-  }
-
   private getTemplateDefinitionContext(
     document: TextDocumentReader,
     position: DocumentPosition
@@ -550,12 +434,12 @@ export class ArgoYamlNavigationService {
       return undefined;
     }
 
-    if (!this.isDirectTemplateDefinition(document, position)) {
+    if (!isDirectTemplateDefinition(document, position.line)) {
       return undefined;
     }
 
     const templateName = this.getNameAtPosition(document, position);
-    const resource = this.getContainingArgoResource(document, position);
+    const resource = getContainingArgoResource(document, position);
 
     if (!templateName || !resource) {
       return undefined;
@@ -564,69 +448,16 @@ export class ArgoYamlNavigationService {
     return { resource, templateName };
   }
 
-  private isDirectTemplateDefinition(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): boolean {
-    const templatesLineIndex = this.findContainingTemplatesSection(document, position);
-    if (templatesLineIndex === -1) {
-      return false;
-    }
-
-    return getIndent(document.getLine(position.line)) === getIndent(document.getLine(templatesLineIndex)) + 2;
-  }
-
-  private findContainingTemplatesSection(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): number {
-    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
-      const line = document.getLine(lineIndex);
-      if (line.includes("templates:")) {
-        return lineIndex;
-      }
-      if (line.includes("kind:") || line.includes("apiVersion:")) {
-        return -1;
-      }
-    }
-
-    return -1;
-  }
-
-  private getContainingArgoResource(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): ArgoResourceContext | undefined {
-    for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
-      const line = document.getLine(lineIndex);
-      const kind = getArgoResourceKind(line);
-      if (!kind) {
-        continue;
-      }
-
-      const endLine = Math.min(document.lineCount, lineIndex + 20);
-      for (let metadataLineIndex = lineIndex + 1; metadataLineIndex < endLine; metadataLineIndex++) {
-        const metadataLine = document.getLine(metadataLineIndex);
-        if (metadataLine.includes("name:") || metadataLine.includes("generateName:")) {
-          const name = extractNavigationValue(metadataLine);
-          return name ? { kind, name } : undefined;
-        }
-      }
-    }
-
-    return undefined;
-  }
-
   private getWorkflowTemplateDefinitionName(
     document: TextDocumentReader,
     position: DocumentPosition
   ): { workflowTemplateName: string; clusterScope?: true } | undefined {
     const currentLine = document.getLine(position.line);
-    if (!currentLine.includes("name:") || !this.isInWorkflowTemplateMetadata(document, position)) {
+    if (!currentLine.includes("name:") || !isInReusableTemplateMetadata(document, position)) {
       return undefined;
     }
 
-    const resource = this.getContainingArgoResource(document, position);
+    const resource = getContainingArgoResource(document, position);
     if (!resource || !isReusableTemplateKind(resource.kind)) {
       return undefined;
     }
@@ -635,31 +466,6 @@ export class ArgoYamlNavigationService {
       workflowTemplateName: resource.name,
       ...(resource.kind === "ClusterWorkflowTemplate" ? { clusterScope: true } : {})
     };
-  }
-
-  private isInWorkflowTemplateMetadata(
-    document: TextDocumentReader,
-    position: DocumentPosition
-  ): boolean {
-    let foundWorkflowTemplate = false;
-    let foundMetadata = false;
-    const startLine = Math.max(0, position.line - 20);
-
-    for (let lineIndex = position.line; lineIndex >= startLine; lineIndex--) {
-      const line = document.getLine(lineIndex);
-      if (line.includes("metadata:")) {
-        foundMetadata = true;
-      }
-      if (line.includes("kind: WorkflowTemplate") || line.includes("kind: ClusterWorkflowTemplate")) {
-        foundWorkflowTemplate = true;
-        break;
-      }
-      if (line.includes("spec:") || line.includes("status:")) {
-        return false;
-      }
-    }
-
-    return foundWorkflowTemplate && foundMetadata;
   }
 
   private getLocalTemplateCallContext(
@@ -672,7 +478,7 @@ export class ArgoYamlNavigationService {
     }
 
     const templateName = this.getNameAtPosition(document, position);
-    const resource = this.getContainingArgoResource(document, position);
+    const resource = getContainingArgoResource(document, position);
     if (!templateName || !resource) {
       return undefined;
     }
@@ -693,7 +499,7 @@ export class ArgoYamlNavigationService {
       return false;
     }
 
-    return this.findReferenceBlockLine(document, position, "templateRef") === undefined;
+    return findReferenceBlockLine(document, position, "templateRef") === undefined;
   }
 
   private hasNavigationValue(line: string): boolean {
