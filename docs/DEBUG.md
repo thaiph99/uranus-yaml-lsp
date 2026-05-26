@@ -3,7 +3,7 @@
 Navigation has three stages:
 
 1. `argoYamlDocumentContext.ts` finds the enclosing resource, template, DAG section, or reusable-reference block at the cursor.
-2. `ArgoYamlNavigationService` classifies that YAML value as a definition search or a reference search target.
+2. `ArgoYamlNavigationService.getNavigationTarget()` is the core classification API; it turns that YAML value into a definition search or reference search target.
 3. Shared target-search routing calls `TemplateSearchService`, which reads workspace files through `WorkspaceCacheService` and delegates YAML location matching to `argoYamlLocationSearch.ts`.
 
 VS Code and the LSP server are adapters: they convert editor documents and positions to core inputs and convert core locations back to editor locations.
