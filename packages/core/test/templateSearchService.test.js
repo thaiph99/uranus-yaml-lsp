@@ -138,6 +138,40 @@ test('findLocalTemplateReferences includes entrypoint, onExit, steps, dag, and h
   }
 });
 
+test('findLocalTemplateReferences scopes same-named local resources to the source file', async () => {
+  const content = `apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: duplicate-local-workflow
+spec:
+  templates:
+    - name: main
+      steps:
+        - - name: call-shared
+            template: shared
+    - name: shared`;
+  const fileSystem = {
+    async findYamlFiles() {
+      return ['/workspace/source.yaml', '/workspace/other.yaml'];
+    },
+    async readFileContent() {
+      return content;
+    },
+  };
+  const scopedService = new TemplateSearchService(fileSystem);
+
+  const result = await scopedService.findLocalTemplateReferences(
+    '/workspace',
+    'duplicate-local-workflow',
+    'shared',
+    '/workspace/source.yaml'
+  );
+
+  assert.deepStrictEqual(summarizeLocations(result), [
+    { file: 'source.yaml', line: 10, character: 22, endCharacter: 28 },
+  ]);
+});
+
 test('findTemplateReferences includes cluster-scoped templateRef calls', async () => {
   const result = await service.findTemplateReferences(
     fixturesRoot,

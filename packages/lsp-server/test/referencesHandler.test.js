@@ -173,3 +173,49 @@ spec:
     },
   ]);
 });
+
+test('gr on a local template scopes references to its source file', async () => {
+  const content = `apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: duplicate-local-workflow
+spec:
+  templates:
+    - name: main
+      steps:
+        - - name: call-shared
+            template: shared
+    - name: shared`;
+  const uri = 'file:///workspace/source.yaml';
+  const document = TextDocument.create(uri, 'yaml', 1, content);
+  const documents = { get(documentUri) { return documentUri === uri ? document : undefined; } };
+  const searchService = {
+    findLocalTemplateReferences(rootPath, resourceName, templateName, sourceFilePath) {
+      assert.equal(rootPath, '/workspace');
+      assert.equal(resourceName, 'duplicate-local-workflow');
+      assert.equal(templateName, 'shared');
+      assert.equal(sourceFilePath, '/workspace/source.yaml');
+      return Promise.resolve({
+        templateName,
+        locations: [{ file: sourceFilePath, line: 9, character: 22, endCharacter: 28 }],
+      });
+    },
+  };
+
+  const handler = new ReferencesHandler(searchService, documents, '/workspace');
+  const locations = await handler.handleReferences({
+    textDocument: { uri },
+    position: { line: 10, character: 13 },
+    context: { includeDeclaration: false },
+  });
+
+  assert.deepStrictEqual(locations, [
+    {
+      uri: 'file:///workspace/source.yaml',
+      range: {
+        start: { line: 9, character: 22 },
+        end: { line: 9, character: 28 },
+      },
+    },
+  ]);
+});

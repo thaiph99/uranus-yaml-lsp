@@ -4,6 +4,7 @@ import {
   TextDocuments
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { fileURLToPath } from 'node:url';
 import {
   ArgoYamlNavigationTarget,
   ArgoYamlNavigationService,
@@ -35,15 +36,23 @@ export class ReferencesHandler {
       return [];
     }
 
-    return this.findReferences(target);
+    const sourceFilePath = document.uri.startsWith('file:')
+      ? fileURLToPath(document.uri)
+      : undefined;
+
+    return this.findReferences(target, sourceFilePath);
   }
 
-  private async findReferences(target: ArgoYamlNavigationTarget): Promise<Location[]> {
+  private async findReferences(
+    target: ArgoYamlNavigationTarget,
+    sourceFilePath?: string
+  ): Promise<Location[]> {
     try {
       const searchResult = await searchTargetReferences(
         this.templateSearchService,
         this.workspaceRoot,
-        target
+        target,
+        sourceFilePath
       );
 
       return toLspLocations(searchResult.locations);

@@ -112,9 +112,12 @@ export class TemplateSearchService {
   public async findLocalTemplateReferences(
     rootPath: string,
     resourceName: string,
-    templateName: string
+    templateName: string,
+    sourceFilePath?: string
   ): Promise<TemplateSearchResult> {
-    const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
+    const yamlFiles = sourceFilePath
+      ? [sourceFilePath]
+      : await this.fileSystemService.findYamlFiles(rootPath);
     const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
       findLocalTemplateReferences(content, filePath, resourceName, templateName)
     );

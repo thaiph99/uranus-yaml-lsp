@@ -83,7 +83,7 @@ export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider, vs
       return undefined;
     }
 
-    return this.findReferenceLocations(workspaceFolder.uri.fsPath, target, token);
+    return this.findReferenceLocations(workspaceFolder.uri.fsPath, document.uri.fsPath, target, token);
   }
 
   private async findLocations(
@@ -106,11 +106,17 @@ export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider, vs
 
   private async findReferenceLocations(
     rootPath: string,
+    sourceFilePath: string,
     target: ArgoYamlNavigationTarget,
     token: vscode.CancellationToken
   ): Promise<vscode.Location[] | undefined> {
     try {
-      const searchResult = await searchTargetReferences(this.templateSearchService, rootPath, target);
+      const searchResult = await searchTargetReferences(
+        this.templateSearchService,
+        rootPath,
+        target,
+        sourceFilePath
+      );
       if (token.isCancellationRequested || searchResult.locations.length === 0) {
         return undefined;
       }

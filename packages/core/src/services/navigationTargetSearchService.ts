@@ -44,7 +44,8 @@ export function searchTargetDefinition(
 export function searchTargetReferences(
   service: TemplateSearchService,
   rootPath: string,
-  target: ArgoYamlNavigationTarget
+  target: ArgoYamlNavigationTarget,
+  sourceFilePath?: string
 ): Promise<TemplateSearchResult> {
   switch (target.kind) {
     case "templateDefinition":
@@ -57,7 +58,12 @@ export function searchTargetReferences(
       );
     case "localTemplateDefinition":
     case "localTemplateReferences":
-      return service.findLocalTemplateReferences(rootPath, target.resourceName, target.templateName);
+      return service.findLocalTemplateReferences(
+        rootPath,
+        target.resourceName,
+        target.templateName,
+        sourceFilePath
+      );
     case "dagTaskDefinition":
     case "dagTaskReferences":
       return service.findDagTaskReferences(rootPath, target.resourceName, target.templateName, target.taskName);
