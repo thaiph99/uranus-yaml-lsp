@@ -6,8 +6,8 @@ Automated coverage is split by ownership:
 | --- | --- |
 | `packages/core/test/argoYamlNavigationService.test.js` | Maps cursor positions to definition or reference targets, including local calls, DAG dependencies, and `clusterScope` |
 | `packages/core/test/templateSearchService.test.js` | Finds exact definition/reference locations in fixtures and preserves resource/DAG scope |
-| `packages/lsp-server/test/definitionHandler.test.js` | Routes `gd` targets to core searches and returns LSP locations |
-| `packages/lsp-server/test/referencesHandler.test.js` | Routes `gr` targets, including DAG and cluster-scoped references |
+| `packages/lsp-server/test/definitionHandler.test.js` | Routes `gd` targets to core searches and preserves exact LSP result ranges |
+| `packages/lsp-server/test/referencesHandler.test.js` | Routes `gr` targets, including DAG and cluster-scoped references, with exact ranges |
 
 Run all automated navigation checks with:
 
