@@ -13,6 +13,7 @@ All notable changes to the "uranus-yaml-lsp" extension will be documented in thi
 ### Changed
 - Split cursor context lookup, YAML structure traversal, content-level location matching, and DAG dependency parsing out of target classification and workspace scan orchestration to clarify core navigation responsibilities.
 - Isolated cursor token and scalar recognition from semantic navigation-target classification.
+- Isolated semantic navigation context recognition so the public navigation service contains target precedence and mapping only.
 - Consolidated workspace file caching so editor lifecycle disposal clears the cache used for navigation searches.
 - Removed unused transitional core navigation helpers; integrations use `ArgoYamlNavigationService.getNavigationTarget()` as the classification API.
 

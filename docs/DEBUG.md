@@ -1,15 +1,16 @@
 # Debugging Navigation
 
-Navigation has three stages:
+Navigation has four stages:
 
 1. `argoYamlCursorSyntax.ts` reads the navigable token under the cursor, and `argoYamlDocumentContext.ts` finds its enclosing resource, template, DAG section, or reusable-reference block.
-2. `ArgoYamlNavigationService.getNavigationTarget()` is the core classification API; it turns that YAML value into a definition search or reference search target.
-3. Shared target-search routing calls `TemplateSearchService`, which reads workspace files through `WorkspaceCacheService` and delegates YAML location matching to `argoYamlLocationSearch.ts`.
+2. `argoYamlTargetContext.ts` recognizes whether that value is a DAG task, template declaration, reusable-template call, or local call.
+3. `ArgoYamlNavigationService.getNavigationTarget()` is the public classification API; it maps the recognized context to a definition or reference search target.
+4. Shared target-search routing calls `TemplateSearchService`, which reads workspace files through `WorkspaceCacheService` and delegates YAML location matching to `argoYamlLocationSearch.ts`.
 
 VS Code and the LSP server are adapters: they convert editor documents and positions to core inputs and convert core locations back to editor locations.
 LSP handlers share their document reader and result-range conversion in `lspNavigationAdapter.ts`, so returned locations retain the YAML value span identified by core search.
 
-Shared YAML vocabulary, such as Argo resource kinds, navigation scalar values, and indentation, belongs in `argoYamlSyntax.ts`. Cursor token recognition belongs in `argoYamlCursorSyntax.ts`; cursor-relative containing-block lookup belongs in `argoYamlDocumentContext.ts`; reusable resource and template traversal belongs in `argoYamlStructure.ts`; content matches and exact result ranges belong in `argoYamlLocationSearch.ts`. `WorkspaceCacheService` owns cached file contents used during workspace scans. Parsing of DAG `dependencies` and `depends` expressions belongs in `dagDependencySyntax.ts`. Keep editor protocol concerns out of core parsing and keep YAML regular expressions out of adapters.
+Shared YAML vocabulary, such as Argo resource kinds, navigation scalar values, and indentation, belongs in `argoYamlSyntax.ts`. Cursor token recognition belongs in `argoYamlCursorSyntax.ts`; cursor-relative containing-block lookup belongs in `argoYamlDocumentContext.ts`; semantic context detection belongs in `argoYamlTargetContext.ts`; reusable resource and template traversal belongs in `argoYamlStructure.ts`; content matches and exact result ranges belong in `argoYamlLocationSearch.ts`. `WorkspaceCacheService` owns cached file contents used during workspace scans. Parsing of DAG `dependencies` and `depends` expressions belongs in `dagDependencySyntax.ts`. Keep editor protocol concerns out of core parsing and keep YAML regular expressions out of adapters.
 
 ## Commands
 
