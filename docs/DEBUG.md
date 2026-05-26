@@ -7,7 +7,7 @@ Navigation has two stages:
 
 VS Code and the LSP server are adapters: they convert editor documents and positions to core inputs and convert core locations back to editor locations.
 
-Shared YAML vocabulary, such as Argo resource kinds, navigation scalar values, and indentation, belongs in `argoYamlSyntax.ts`. Parsing of DAG `dependencies` and `depends` expressions belongs in `dagDependencySyntax.ts`. Keep editor protocol concerns out of core parsing and keep YAML regular expressions out of adapters.
+Shared YAML vocabulary, such as Argo resource kinds, navigation scalar values, and indentation, belongs in `argoYamlSyntax.ts`. Resource, `templates`, and scoped DAG `tasks` traversal belongs in `argoYamlStructure.ts`. Parsing of DAG `dependencies` and `depends` expressions belongs in `dagDependencySyntax.ts`. Keep editor protocol concerns out of core parsing and keep YAML regular expressions out of adapters.
 
 ## Commands
 
