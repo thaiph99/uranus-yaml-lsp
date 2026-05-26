@@ -2,7 +2,7 @@
 
 All notable changes to the "uranus-yaml-lsp" extension will be documented in this file.
 
-## [Unreleased]
+## [1.0.3] - 2026-05-26
 
 ### Added
 - Added go-to-definition and find-references navigation for local template calls through `entrypoint`, `onExit`, `template`, hooks, and DAG tasks.

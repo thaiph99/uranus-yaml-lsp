@@ -2,7 +2,7 @@
   "name": "uranus-yaml",
   "displayName": "Uranus YAML LSP",
   "description": "Argo Workflow YAML navigation for WorkflowTemplate definitions and references.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "ThaiPham",
   "author": {
     "name": "Thai Pham"
@@ -64,7 +64,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@uranus-yaml/core": "^0.0.1",
+    "@uranus-yaml/core": "^0.0.2",
     "@vscode/vsce": "^3.0.0",
     "@types/vscode": "^1.80.0",
     "@types/node": "^18.0.0",
