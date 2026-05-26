@@ -172,6 +172,29 @@ spec:
   ]);
 });
 
+test('findLocalTemplateReferences locates local template calls in a second workflow file', async () => {
+  const sourceFile = path.join(fixturesRoot, 'dag-dependencies-copy.yaml');
+  const dagReference = await service.findLocalTemplateReferences(
+    fixturesRoot,
+    'dag-dependency-workflow-copy',
+    'dependency-dag-duplicate',
+    sourceFile
+  );
+  const stepsReference = await service.findLocalTemplateReferences(
+    fixturesRoot,
+    'dag-dependency-workflow-copy',
+    'steps-negative-tests',
+    sourceFile
+  );
+
+  assert.deepStrictEqual(summarizeLocations(dagReference), [
+    { file: 'dag-dependencies-copy.yaml', line: 25, character: 22, endCharacter: 46 },
+  ]);
+  assert.deepStrictEqual(summarizeLocations(stepsReference), [
+    { file: 'dag-dependencies-copy.yaml', line: 33, character: 22, endCharacter: 42 },
+  ]);
+});
+
 test('findTemplateReferences includes cluster-scoped templateRef calls', async () => {
   const result = await service.findTemplateReferences(
     fixturesRoot,
