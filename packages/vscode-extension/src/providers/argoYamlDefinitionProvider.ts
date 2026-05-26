@@ -2,6 +2,10 @@ import * as vscode from "vscode";
 import {
   ArgoYamlNavigationService,
   ArgoYamlNavigationTarget,
+  DefinitionNavigationTarget,
+  isDefinitionNavigationTarget,
+  searchTargetDefinition,
+  searchTargetReferences,
   TemplateSearchService,
   TextDocumentReader,
   WorkflowTemplateLocation
@@ -18,14 +22,9 @@ class VsCodeDocumentReader implements TextDocumentReader {
     return this.document.lineAt(line).text;
   }
 
-  public getTextInRange(startLine: number, endLine: number): string {
-    return this.document.getText(
-      new vscode.Range(startLine, 0, endLine, 0)
-    );
-  }
 }
 
-export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider {
+export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider, vscode.ReferenceProvider {
   constructor(
     private readonly templateSearchService: TemplateSearchService,
     private readonly navigationService = new ArgoYamlNavigationService()
@@ -54,16 +53,46 @@ export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider {
       return undefined;
     }
 
+    if (!isDefinitionNavigationTarget(target)) {
+      return new vscode.Location(document.uri, position);
+    }
+
     return this.findLocations(workspaceFolder.uri.fsPath, target, token);
+  }
+
+  public async provideReferences(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    _context: vscode.ReferenceContext,
+    token: vscode.CancellationToken
+  ): Promise<vscode.Location[] | undefined> {
+    if (token.isCancellationRequested) {
+      return undefined;
+    }
+
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      return undefined;
+    }
+
+    const target = this.navigationService.getNavigationTarget(
+      new VsCodeDocumentReader(document),
+      position
+    );
+    if (!target) {
+      return undefined;
+    }
+
+    return this.findReferenceLocations(workspaceFolder.uri.fsPath, document.uri.fsPath, target, token);
   }
 
   private async findLocations(
     rootPath: string,
-    target: ArgoYamlNavigationTarget,
+    target: DefinitionNavigationTarget,
     token: vscode.CancellationToken
   ): Promise<vscode.Location[] | undefined> {
     try {
-      const searchResult = await this.search(rootPath, target);
+      const searchResult = await searchTargetDefinition(this.templateSearchService, rootPath, target);
       if (token.isCancellationRequested || searchResult.locations.length === 0) {
         return undefined;
       }
@@ -75,30 +104,27 @@ export class ArgoYamlDefinitionProvider implements vscode.DefinitionProvider {
     }
   }
 
-  private search(rootPath: string, target: ArgoYamlNavigationTarget) {
-    switch (target.kind) {
-      case "templateDefinition":
-        return this.templateSearchService.findTemplateInWorkflowTemplate(
-          rootPath,
-          target.workflowTemplateName,
-          target.templateName
-        );
-      case "workflowTemplateDefinition":
-        return this.templateSearchService.findTemplateDefinition(
-          rootPath,
-          target.workflowTemplateName
-        );
-      case "templateReferences":
-        return this.templateSearchService.findTemplateReferences(
-          rootPath,
-          target.workflowTemplateName,
-          target.templateName
-        );
-      case "workflowTemplateReferences":
-        return this.templateSearchService.findWorkflowTemplateReferences(
-          rootPath,
-          target.workflowTemplateName
-        );
+  private async findReferenceLocations(
+    rootPath: string,
+    sourceFilePath: string,
+    target: ArgoYamlNavigationTarget,
+    token: vscode.CancellationToken
+  ): Promise<vscode.Location[] | undefined> {
+    try {
+      const searchResult = await searchTargetReferences(
+        this.templateSearchService,
+        rootPath,
+        target,
+        sourceFilePath
+      );
+      if (token.isCancellationRequested || searchResult.locations.length === 0) {
+        return undefined;
+      }
+
+      return this.toVsCodeLocations(searchResult.locations);
+    } catch (error) {
+      console.error("Error finding Argo YAML references:", error);
+      return undefined;
     }
   }
 

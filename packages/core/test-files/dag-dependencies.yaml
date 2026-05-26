@@ -1,0 +1,59 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: dag-dependency-workflow
+spec:
+  entrypoint: dependency-dag
+  templates:
+    - name: dependency-dag
+      dag:
+        tasks:
+          - name: A
+            template: template-name-collision
+          - name: B
+            template: task-body
+          - name: C
+            template: task-body
+          - name: train-model-1
+            template: task-body
+          - name: fan_in
+            template: task-body
+          - name: inline-dependencies
+            template: task-body
+            dependencies: [A, train-model-1]
+          - name: multiline-dependencies
+            template: task-body
+            dependencies:
+              - A
+              - fan_in
+          - name: enhanced-depends
+            template: task-body
+            depends: "A && (B.Succeeded || !C.Failed) && train-model-1.AnySucceeded && fan_in.Succeeded"
+          - name: downstream-task
+            template: task-body
+            dependencies: [inline-dependencies, multiline-dependencies]
+          - name: template-name-collision
+            template: task-body
+            depends: A
+    - name: dependency-dag-duplicate
+      dag:
+        tasks:
+          - name: A
+            template: task-body
+          - name: B
+            template: task-body
+          - name: duplicate-downstream
+            template: task-body
+            dependencies: [A, B]
+    - name: steps-negative-tests
+      steps:
+        - - name: invalid-step-depends
+            template: task-body
+            depends: A
+            dependencies: [B]
+    - name: task-body
+      container:
+        image: alpine:3.19
+    - name: template-name-collision
+      container:
+        image: alpine:3.19

@@ -1,73 +1,30 @@
-# Debug Guide for Ctrl+Click Navigation
+# Debugging Navigation
 
-## How Ctrl+Click Works Now
+Navigation has four stages:
 
-The extension now uses **Ctrl+Click** for smart navigation based on context:
+1. `argoYamlCursorSyntax.ts` reads the navigable token under the cursor, and `argoYamlDocumentContext.ts` finds its enclosing resource, template, DAG section, or reusable-reference block.
+2. `argoYamlTargetContext.ts` recognizes whether that value is a DAG task, template declaration, reusable-template call, or local call.
+3. `ArgoYamlNavigationService.getNavigationTarget()` is the public classification API; it maps the recognized context to a definition or reference search target.
+4. Shared target-search routing calls `TemplateSearchService`, which reads workspace files through `WorkspaceCacheService` and delegates YAML location matching to `argoYamlLocationSearch.ts`.
 
-### Context 1: Template Reference to Go to Definition
-**When**: Ctrl+Click on template references in usage files
-**Action**: Navigate to template definition
+VS Code and the LSP server are adapters: they convert editor documents and positions to core inputs and convert core locations back to editor locations.
+LSP handlers share their document reader and result-range conversion in `lspNavigationAdapter.ts`, so returned locations retain the YAML value span identified by core search.
 
-```yaml
-# In workflow.yaml - Ctrl+Click on "step1":
-templateRef:
-  name: tem-tem1
-  template: step1  # Ctrl+Click here goes to definition
-```
+Shared YAML vocabulary, such as Argo resource kinds, navigation scalar values, and indentation, belongs in `argoYamlSyntax.ts`. Cursor token recognition belongs in `argoYamlCursorSyntax.ts`; cursor-relative containing-block lookup belongs in `argoYamlDocumentContext.ts`; semantic context detection belongs in `argoYamlTargetContext.ts`; reusable resource and template traversal belongs in `argoYamlStructure.ts`; content matches and exact result ranges belong in `argoYamlLocationSearch.ts`. `WorkspaceCacheService` owns cached file contents used during workspace scans. Parsing of DAG `dependencies` and `depends` expressions belongs in `dagDependencySyntax.ts`. Keep editor protocol concerns out of core parsing and keep YAML regular expressions out of adapters.
 
-### Context 2: Template Definition to Find All References
-**When**: Ctrl+Click on template names in WorkflowTemplate definition files
-**Action**: Show all references to this template
+## Commands
 
-```yaml
-# In tem1.yaml - Ctrl+Click on "step1":
-spec:
-  templates:
-    - name: step1  # Ctrl+Click here shows all references
-      container:
-        image: alpine
-```
+- Use Go to Definition (`F12`, Ctrl+Click in VS Code, or `gd` in Neovim) on a call value.
+- Use Find All References (`Shift+F12` in VS Code or `gr` in Neovim) on a declaration.
 
-### Context 3: WorkflowTemplate Name Definition to Find All References
-**When**: Ctrl+Click on WorkflowTemplate names in metadata section
-**Action**: Show all references to this WorkflowTemplate
+Do not use Ctrl+Click as a reference-search test: VS Code invokes its definition provider for Ctrl+Click.
 
-```yaml
-# In tem1.yaml - Ctrl+Click on "tem-tem1":
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
-metadata:
-  name: tem-tem1  # Ctrl+Click here shows all WorkflowTemplate references
-spec:
-  templates:
-    - name: step1
-```
+## Diagnosis Checklist
 
-## Testing Steps
+1. Reproduce the issue in one of the fixtures under `packages/core/test-files`.
+2. Determine whether the cursor should resolve a local template, reusable template, DAG task, or reusable-template resource.
+3. Add or adjust a core navigation test if the target kind is wrong.
+4. Add or adjust a core search test if the target is correct but its locations are wrong.
+5. Add an LSP handler test only when protocol conversion or target routing is at fault.
 
-1. **Launch Extension Development Host**:
-   ```
-   Press F5 in VS Code
-   ```
-
-2. **Test Go to Definition**:
-   - Open `workflow.yaml`
-   - Ctrl+Click on `step1` in `template: step1`
-   - Should navigate to `tem1.yaml`
-
-3. **Test Find Template References**:
-   - Open `tem1.yaml`
-   - Ctrl+Click on `step1` in `- name: step1`
-   - Should show references panel with template usage
-
-4. **Test Find WorkflowTemplate References**:
-   - Open `tem1.yaml`
-   - Ctrl+Click on `tem-tem1` in `name: tem-tem1`
-   - Should show references panel with WorkflowTemplate usage
-
-## Expected Results
-
-- **From `workflow.yaml`**: Ctrl+Click navigates to definition
-- **From `tem1.yaml` template names**: Ctrl+Click shows template references
-- **From `tem1.yaml` WorkflowTemplate name**: Ctrl+Click shows WorkflowTemplate references
-- **Smart Context Detection**: Extension automatically detects what you're clicking on
+For manual reproduction steps, see [TESTING.md](TESTING.md).

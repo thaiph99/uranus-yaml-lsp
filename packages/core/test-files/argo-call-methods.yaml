@@ -1,0 +1,103 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: local-function-workflow
+spec:
+  entrypoint: main
+  onExit: exit-handler
+  hooks:
+    running:
+      expression: workflow.status == "Running"
+      template: workflow-hook
+  templates:
+    - name: main
+      steps:
+        - - name: run-step-template
+            template: step-template
+            hooks:
+              exit:
+                template: hook-template
+        - - name: run-external-template
+            templateRef:
+              name: tem-tem1
+              template: step1
+        - - name: run-cluster-template
+            templateRef:
+              name: cluster-library
+              template: cluster-step
+              clusterScope: true
+    - name: dag-orchestrator
+      dag:
+        tasks:
+          - name: run-dag-template
+            template: dag-template
+    - name: step-template
+      container:
+        image: alpine
+    - name: dag-template
+      container:
+        image: alpine
+    - name: hook-template
+      container:
+        image: alpine
+    - name: workflow-hook
+      container:
+        image: alpine
+    - name: exit-handler
+      container:
+        image: alpine
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ClusterWorkflowTemplate
+metadata:
+  name: cluster-library
+spec:
+  templates:
+    - name: cluster-step
+      container:
+        image: alpine
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: cluster-library
+spec:
+  templates:
+    - name: cluster-step
+      container:
+        image: regular-library
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: library-scope-calls
+spec:
+  templates:
+    - name: call-library
+      steps:
+        - - name: call-namespaced
+            templateRef:
+              name: cluster-library
+              template: cluster-step
+        - - name: call-cluster
+            templateRef:
+              name: cluster-library
+              template: cluster-step
+              clusterScope: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: full-workflow-scope-calls
+spec:
+  workflowTemplateRef:
+    name: cluster-library
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: full-cluster-workflow-scope-calls
+spec:
+  workflowTemplateRef:
+    name: cluster-library
+    clusterScope: true

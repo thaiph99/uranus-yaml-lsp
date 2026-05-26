@@ -7,38 +7,13 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
   ArgoYamlNavigationService,
   ArgoYamlNavigationTarget,
-  TemplateSearchResult,
+  DefinitionNavigationTarget,
+  isDefinitionNavigationTarget,
+  searchTargetDefinition,
   TemplateSearchService,
-  TextDocumentReader,
-  WorkflowTemplateLocation
+  TextDocumentReader
 } from '@uranus-yaml/core';
-
-type DefinitionNavigationTarget = Extract<
-  ArgoYamlNavigationTarget,
-  { readonly kind: 'templateDefinition' | 'workflowTemplateDefinition' }
->;
-
-class LspDocumentReader implements TextDocumentReader {
-  public readonly lineCount: number;
-
-  constructor(private readonly document: TextDocument) {
-    this.lineCount = document.lineCount;
-  }
-
-  public getLine(line: number): string {
-    return this.document.getText({
-      start: { line, character: 0 },
-      end: { line, character: Number.MAX_VALUE }
-    });
-  }
-
-  public getTextInRange(startLine: number, endLine: number): string {
-    return this.document.getText({
-      start: { line: startLine, character: 0 },
-      end: { line: endLine, character: 0 }
-    });
-  }
-}
+import { LspDocumentReader, toLspLocations } from './lspNavigationAdapter';
 
 export class DefinitionHandler {
   constructor(
@@ -64,23 +39,17 @@ export class DefinitionHandler {
       return null;
     }
 
-    if (!this.isDefinitionTarget(target)) {
+    if (!isDefinitionNavigationTarget(target)) {
       return [this.toCurrentNameLocation(params, documentReader, target)];
     }
 
     return this.findDefinitionLocations(target);
   }
 
-  private isDefinitionTarget(
-    target: ArgoYamlNavigationTarget
-  ): target is DefinitionNavigationTarget {
-    return target.kind === 'templateDefinition' || target.kind === 'workflowTemplateDefinition';
-  }
-
   private async findDefinitionLocations(target: DefinitionNavigationTarget): Promise<Location[]> {
     try {
-      const searchResult = await this.searchDefinitions(target);
-      return this.toLocations(searchResult.locations);
+      const searchResult = await searchTargetDefinition(this.templateSearchService, this.workspaceRoot, target);
+      return toLspLocations(searchResult.locations);
     } catch (error) {
       console.error("Error resolving Argo YAML definition:", error);
       return [];
@@ -93,9 +62,7 @@ export class DefinitionHandler {
     target: ArgoYamlNavigationTarget
   ): Location {
     const line = document.getLine(params.position.line);
-    const name = target.kind === 'templateReferences'
-      ? target.templateName
-      : target.workflowTemplateName;
+    const name = this.getTargetName(target);
     const character = this.findNameStartCharacter(line, name) ?? params.position.character;
     const position = { line: params.position.line, character };
 
@@ -106,6 +73,22 @@ export class DefinitionHandler {
         end: position
       }
     };
+  }
+
+  private getTargetName(target: ArgoYamlNavigationTarget): string {
+    switch (target.kind) {
+      case 'templateDefinition':
+      case 'templateReferences':
+      case 'localTemplateDefinition':
+      case 'localTemplateReferences':
+        return target.templateName;
+      case 'dagTaskDefinition':
+      case 'dagTaskReferences':
+        return target.taskName;
+      case 'workflowTemplateDefinition':
+      case 'workflowTemplateReferences':
+        return target.workflowTemplateName;
+    }
   }
 
   private findNameStartCharacter(line: string, expectedValue: string): number | undefined {
@@ -121,31 +104,5 @@ export class DefinitionHandler {
     }
 
     return match.index + characterInMatch;
-  }
-
-  private searchDefinitions(target: DefinitionNavigationTarget): Promise<TemplateSearchResult> {
-    switch (target.kind) {
-      case 'templateDefinition':
-        return this.templateSearchService.findTemplateInWorkflowTemplate(
-          this.workspaceRoot,
-          target.workflowTemplateName,
-          target.templateName
-        );
-      case 'workflowTemplateDefinition':
-        return this.templateSearchService.findTemplateDefinition(
-          this.workspaceRoot,
-          target.workflowTemplateName
-        );
-    }
-  }
-
-  private toLocations(locations: readonly WorkflowTemplateLocation[]): Location[] {
-    return locations.map((location) => ({
-      uri: `file://${location.file}`,
-      range: {
-        start: { line: location.line, character: location.character },
-        end: { line: location.line, character: location.character }
-      }
-    }));
   }
 }

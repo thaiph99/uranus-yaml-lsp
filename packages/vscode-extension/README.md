@@ -1,6 +1,6 @@
 # Uranus YAML VS Code Extension
 
-This package provides the VS Code adapter for Uranus YAML. It registers a YAML definition provider and delegates Argo Workflow navigation to `@uranus-yaml/core`.
+This package provides the VS Code adapter for Uranus YAML. It registers YAML definition and reference providers and delegates Argo Workflow navigation to `@uranus-yaml/core`.
 
 ## Install
 
@@ -23,15 +23,17 @@ code --install-extension packages/vscode-extension/uranus-yaml-*.vsix
 
 1. Open a workspace that contains Argo Workflow YAML files.
 2. Open a `.yaml` or `.yml` file.
-3. Ctrl+Click a template or WorkflowTemplate name.
+3. Use `F12` on a call to go to its definition or `Shift+F12` on a definition to find uses.
 
 Supported navigation:
 
 - `templateRef.template`: jump to the template definition.
 - `templateRef.name`: jump to the WorkflowTemplate definition.
 - `workflowTemplateRef.name`: jump to the WorkflowTemplate definition.
-- Template definitions under `spec.templates`: show template references.
-- WorkflowTemplate `metadata.name`: show WorkflowTemplate references.
+- Local `template`, `entrypoint`, `onExit`, and hook calls: jump to local template definitions.
+- DAG `dependencies` and enhanced `depends`: jump to DAG task declarations and find dependent tasks.
+- `clusterScope: true`: resolve against `ClusterWorkflowTemplate`, not same-named `WorkflowTemplate` resources.
+- Template definitions and reusable-template `metadata.name`: find their references with `Shift+F12`.
 
 ## Example
 
@@ -76,8 +78,9 @@ Manual test flow:
 
 1. Press F5 in VS Code to open an Extension Development Host.
 2. Open `packages/core/test-files`.
-3. Ctrl+Click `tem-tem1` and `step1` in the fixtures.
-4. Confirm navigation resolves definitions and references without notification popups.
+3. Use `F12` on the call forms in `argo-call-methods.yaml` and `dag-dependencies.yaml`.
+4. Use `Shift+F12` from their template and DAG task definitions.
+5. Confirm the colliding `cluster-library` resources resolve according to `clusterScope`.
 
 Package the extension:
 
