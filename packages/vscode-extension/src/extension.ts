@@ -3,15 +3,13 @@ import { ArgoYamlDefinitionProvider } from "./providers/argoYamlDefinitionProvid
 import { TemplateSearchService, FileSystemService, WorkspaceCacheService } from "@uranus-yaml/core";
 
 export function activate(context: vscode.ExtensionContext): void {
-  // Initialize services with dependency injection
   const workspaceCacheService = new WorkspaceCacheService();
   const fileSystemService = new FileSystemService();
-  const templateSearchService = new TemplateSearchService(fileSystemService);
+  const templateSearchService = new TemplateSearchService(fileSystemService, workspaceCacheService);
   const definitionProvider = new ArgoYamlDefinitionProvider(
     templateSearchService
   );
 
-  // Register the definition provider for YAML files
   const definitionProviderDisposable = vscode.languages.registerDefinitionProvider(
     { language: "yaml" },
     definitionProvider
@@ -21,14 +19,9 @@ export function activate(context: vscode.ExtensionContext): void {
     definitionProvider
   );
 
-  // Register disposables
   context.subscriptions.push(
     definitionProviderDisposable,
     referencesProviderDisposable,
     workspaceCacheService
   );
-}
-
-export function deactivate(): void {
-  // Cleanup is handled by VS Code through subscriptions
 }

@@ -317,3 +317,39 @@ test('findDagTaskReferences returns exact ranges for downstream task dependencie
     { file: 'dag-dependencies.yaml', line: 34, character: 48, endCharacter: 70 },
   ]);
 });
+
+test('uses an injected workspace cache for repeated searches', async () => {
+  const content = `apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: cached-library`;
+  let cachedContent;
+  let reads = 0;
+  const fileSystem = {
+    async findYamlFiles() {
+      return ['/workspace/cached.yaml'];
+    },
+    async readFileContent() {
+      reads += 1;
+      return content;
+    },
+  };
+  const cache = {
+    get() {
+      return cachedContent;
+    },
+    set(_key, value) {
+      cachedContent = value;
+    },
+  };
+  const cachedService = new TemplateSearchService(fileSystem, cache);
+
+  const first = await cachedService.findTemplateDefinition('/workspace', 'cached-library');
+  const second = await cachedService.findTemplateDefinition('/workspace', 'cached-library');
+
+  assert.deepStrictEqual(summarizeLocations(first), [
+    { file: 'cached.yaml', line: 4, character: 8, endCharacter: 22 },
+  ]);
+  assert.deepStrictEqual(summarizeLocations(second), summarizeLocations(first));
+  assert.equal(reads, 1);
+});

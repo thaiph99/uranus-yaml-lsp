@@ -10,20 +10,17 @@ import {
 } from "./argoYamlLocationSearch";
 import { getReusableTemplateKind } from "./argoYamlSyntax";
 import { FileSystemService } from "./fileSystemService";
-
-interface CachedFileContent {
-  content: string;
-  timestamp: number;
-}
+import { WorkspaceCacheService } from "./workspaceCacheService";
 
 type ContentSearch = (content: string, filePath: string) => WorkflowTemplateLocation[];
 
 export class TemplateSearchService {
-  private readonly fileCache = new Map<string, CachedFileContent>();
-  private readonly cacheTimeout = 30000; // 30 seconds
   private readonly maxConcurrency = 10;
 
-  constructor(private readonly fileSystemService: FileSystemService) {}
+  constructor(
+    private readonly fileSystemService: FileSystemService,
+    private readonly workspaceCacheService = new WorkspaceCacheService()
+  ) {}
 
   public async findTemplateDefinition(
     rootPath: string,
@@ -198,33 +195,14 @@ export class TemplateSearchService {
   }
 
   private async getCachedFileContent(filePath: string): Promise<string> {
-    const cached = this.fileCache.get(filePath);
-    const now = Date.now();
-
-    if (cached && now - cached.timestamp < this.cacheTimeout) {
-      return cached.content;
+    const cached = this.workspaceCacheService.get(filePath);
+    if (cached !== undefined) {
+      return cached;
     }
 
     const content = await this.fileSystemService.readFileContent(filePath);
-    this.fileCache.set(filePath, { content, timestamp: now });
-
-    if (this.fileCache.size > 100) {
-      this.cleanupCache();
-    }
+    this.workspaceCacheService.set(filePath, content);
 
     return content;
-  }
-
-  private cleanupCache(): void {
-    const now = Date.now();
-    const keysToDelete: string[] = [];
-
-    for (const [key, value] of this.fileCache.entries()) {
-      if (now - value.timestamp > this.cacheTimeout) {
-        keysToDelete.push(key);
-      }
-    }
-
-    keysToDelete.forEach((key) => this.fileCache.delete(key));
   }
 }
