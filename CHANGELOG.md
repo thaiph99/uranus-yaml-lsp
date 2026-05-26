@@ -11,7 +11,7 @@ All notable changes to the "uranus-yaml-lsp" extension will be documented in thi
 - Registered the VS Code reference provider so Find All References uses the shared navigation engine.
 
 ### Changed
-- Split shared YAML structure traversal and DAG dependency parsing out of workspace search orchestration to clarify core navigation responsibilities.
+- Split cursor context lookup, shared YAML structure traversal, and DAG dependency parsing out of target classification and workspace search orchestration to clarify core navigation responsibilities.
 
 ## [1.0.2] - 2026-05-17
 

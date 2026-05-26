@@ -1,13 +1,14 @@
 # Debugging Navigation
 
-Navigation has two stages:
+Navigation has three stages:
 
-1. `ArgoYamlNavigationService` classifies the YAML value under the cursor as a definition search or a reference search target.
-2. Shared target-search routing calls `TemplateSearchService`, which scans cached YAML content and returns value ranges.
+1. `argoYamlDocumentContext.ts` finds the enclosing resource, template, DAG section, or reusable-reference block at the cursor.
+2. `ArgoYamlNavigationService` classifies that YAML value as a definition search or a reference search target.
+3. Shared target-search routing calls `TemplateSearchService`, which scans cached YAML content and returns value ranges.
 
 VS Code and the LSP server are adapters: they convert editor documents and positions to core inputs and convert core locations back to editor locations.
 
-Shared YAML vocabulary, such as Argo resource kinds, navigation scalar values, and indentation, belongs in `argoYamlSyntax.ts`. Resource, `templates`, and scoped DAG `tasks` traversal belongs in `argoYamlStructure.ts`. Parsing of DAG `dependencies` and `depends` expressions belongs in `dagDependencySyntax.ts`. Keep editor protocol concerns out of core parsing and keep YAML regular expressions out of adapters.
+Shared YAML vocabulary, such as Argo resource kinds, navigation scalar values, and indentation, belongs in `argoYamlSyntax.ts`. Cursor-relative containing-block lookup belongs in `argoYamlDocumentContext.ts`; workspace content traversal belongs in `argoYamlStructure.ts`. Parsing of DAG `dependencies` and `depends` expressions belongs in `dagDependencySyntax.ts`. Keep editor protocol concerns out of core parsing and keep YAML regular expressions out of adapters.
 
 ## Commands
 
