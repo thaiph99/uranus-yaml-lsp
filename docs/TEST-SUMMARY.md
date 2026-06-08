@@ -8,6 +8,8 @@ Automated coverage is split by ownership:
 | `packages/core/test/templateSearchService.test.js` | Finds exact definition/reference locations in fixtures and preserves resource/DAG scope |
 | `packages/lsp-server/test/definitionHandler.test.js` | Routes `gd` targets to core searches and preserves exact LSP result ranges |
 | `packages/lsp-server/test/referencesHandler.test.js` | Routes `gr` targets, including DAG and cluster-scoped references, with exact ranges |
+| `packages/lsp-server/test/documentCacheSync.test.js` | Refreshes cached searches from live editor documents and decodes `file://` URIs to paths |
+| `packages/lsp-server/test/serverBoot.test.js` | Confirms the built `uranus-yaml-lsp` launcher is executable and advertises definition/reference providers on `initialize` |
 
 Run all automated navigation checks with:
 

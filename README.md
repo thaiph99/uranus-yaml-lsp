@@ -60,7 +60,18 @@ make build
 make install-lsp
 ```
 
-Add this server definition to your Neovim LSP configuration if your `nvim-lspconfig` version does not already include it:
+On Neovim 0.11+ you can register the server with the built-in LSP client (no `nvim-lspconfig` required):
+
+```lua
+vim.lsp.config('uranus_yaml', {
+  cmd = { 'uranus-yaml-lsp', '--stdio' },
+  filetypes = { 'yaml', 'yml' },
+  root_markers = { '.git', 'package.json' },
+})
+vim.lsp.enable('uranus_yaml')
+```
+
+If you use `nvim-lspconfig` and your version does not already include this server, register it explicitly:
 
 ```lua
 local lspconfig = require('lspconfig')
