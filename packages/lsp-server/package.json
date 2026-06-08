@@ -9,12 +9,13 @@
   "scripts": {
     "build:core": "npm --prefix ../core run build",
     "bundle:core": "node scripts/bundleCoreDependency.js",
+    "create:bin": "node scripts/createBinShim.js",
     "compile": "tsc",
-    "build": "npm run build:core && npm run compile && npm run bundle:core",
+    "build": "npm run build:core && npm run compile && npm run bundle:core && npm run create:bin",
     "prepack": "npm run build",
     "test": "node --test test/*.test.js",
     "watch": "tsc -w",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist bin *.tsbuildinfo"
   },
   "dependencies": {
     "vscode-languageserver": "^9.0.1",

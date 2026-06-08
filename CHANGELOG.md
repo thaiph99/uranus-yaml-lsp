@@ -2,6 +2,16 @@
 
 All notable changes to the "uranus-yaml-lsp" extension will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Made fresh-machine builds reproducible: the `uranus-yaml-lsp` launcher shim is now generated during `npm run build` instead of being committed, so a clean `git clone` plus `make build` always produces a runnable binary for Neovim and Zed.
+- Removed the over-broad `bin/` rule from `.gitignore` that previously excluded the LSP launcher; the generated launcher is now ignored by an explicit `packages/lsp-server/bin/` rule.
+- Fixed `clean` scripts to also remove `*.tsbuildinfo`, so `make clean && make build` no longer skips emitting compiled output for the composite `core` project.
+
+### Added
+- Added a launcher boot test that builds and spawns `uranus-yaml-lsp`, asserting the shim is executable and the server advertises definition and reference providers.
+
 ## [1.0.3] - 2026-05-26
 
 ### Added

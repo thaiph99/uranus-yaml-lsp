@@ -60,7 +60,7 @@
     "watch": "tsc -watch -p ./",
     "lint": "tsc --noEmit",
     "package": "vsce package",
-    "clean": "rimraf out"
+    "clean": "rimraf out *.tsbuildinfo"
   },
   "dependencies": {},
   "devDependencies": {
