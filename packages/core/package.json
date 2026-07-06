@@ -1,6 +1,6 @@
 {
   "name": "@uranus-yaml/core",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Shared Argo Workflow YAML navigation engine",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

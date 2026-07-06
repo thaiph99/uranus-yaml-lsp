@@ -7,8 +7,8 @@ Navigation has four stages:
 3. `ArgoYamlNavigationService.getNavigationTarget()` is the public classification API; it maps the recognized context to a definition or reference search target.
 4. Shared target-search routing calls `TemplateSearchService`, which reads workspace files through `WorkspaceCacheService` and delegates YAML location matching to `argoYamlLocationSearch.ts`.
 
-VS Code and the LSP server are adapters: they convert editor documents and positions to core inputs and convert core locations back to editor locations.
-LSP handlers share their document reader and result-range conversion in `lspNavigationAdapter.ts`, so returned locations retain the YAML value span identified by core search.
+VS Code and the LSP server are adapters: they pass the editor document to core as a plain array of lines and convert core locations back to editor locations.
+LSP handlers share their result-range conversion in `lspNavigationAdapter.ts`, so returned locations retain the YAML value span identified by core search.
 
 Shared YAML vocabulary, such as Argo resource kinds, navigation scalar values, and indentation, belongs in `argoYamlSyntax.ts`. Cursor token recognition belongs in `argoYamlCursorSyntax.ts`; cursor-relative containing-block lookup belongs in `argoYamlDocumentContext.ts`; semantic context detection belongs in `argoYamlTargetContext.ts`; reusable resource and template traversal belongs in `argoYamlStructure.ts`; content matches and exact result ranges belong in `argoYamlLocationSearch.ts`. `WorkspaceCacheService` owns cached file contents used during workspace scans. Parsing of DAG `dependencies` and `depends` expressions belongs in `dagDependencySyntax.ts`. Keep editor protocol concerns out of core parsing and keep YAML regular expressions out of adapters.
 

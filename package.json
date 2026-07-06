@@ -1,6 +1,6 @@
 {
   "name": "uranus-yaml-workspace",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Argo Workflow YAML navigation for VS Code and Language Server Protocol clients",
   "private": true,
   "workspaces": [

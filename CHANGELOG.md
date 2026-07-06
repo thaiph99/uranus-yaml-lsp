@@ -2,14 +2,21 @@
 
 All notable changes to the "uranus-yaml-lsp" extension will be documented in this file.
 
-## [Unreleased]
+## [1.0.4] - 2026-07-06
 
 ### Fixed
+- Fixed go-to-definition and find-references finding nothing when YAML sequence items sit at the same indentation as their parent key (for example `templates:` or `tasks:` with `- name:` at the same column). The item indentation is now read from the document instead of assumed to be key indentation + 2, for cross-file searches and for navigation inside such files.
+- Fixed resource boundary and resource-start detection so indented `kind:` / `apiVersion:` lines inside embedded `manifest: |` block scalars no longer end or start an Argo resource; templates defined after an embedded manifest resolve again.
 - Made fresh-machine builds reproducible: the `uranus-yaml-lsp` launcher shim is now generated during `npm run build` instead of being committed, so a clean `git clone` plus `make build` always produces a runnable binary for Neovim and Zed.
 - Removed the over-broad `bin/` rule from `.gitignore` that previously excluded the LSP launcher; the generated launcher is now ignored by an explicit `packages/lsp-server/bin/` rule.
 - Fixed `clean` scripts to also remove `*.tsbuildinfo`, so `make clean && make build` no longer skips emitting compiled output for the composite `core` project.
 
+### Changed
+- **Breaking (`@uranus-yaml/core` 0.1.0):** `ArgoYamlNavigationService.getNavigationTarget()` now takes the document as a plain array of lines; the `TextDocumentReader` interface and the editor-specific reader wrappers were removed. Cursor-side and search-side navigation now share one document representation, one `templateRef` block parser, and one sequence-indent rule.
+- Simplified `TemplateSearchService` (shared workspace-scan helper; reference searches scan each file once), `FileSystemService` (plain recursive walk without no-op batching), the LSP server bootstrap (removed unused configuration plumbing), and the VS Code provider (shared target and location conversion).
+
 ### Added
+- Fixtures and tests covering same-indent sequence styles and embedded manifests across template, DAG task, and dependency navigation.
 - Added a launcher boot test that builds and spawns `uranus-yaml-lsp`, asserting the shim is executable and the server advertises definition and reference providers.
 
 ## [1.0.3] - 2026-05-26
