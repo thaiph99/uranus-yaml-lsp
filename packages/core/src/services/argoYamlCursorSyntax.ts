@@ -1,35 +1,23 @@
 import { extractNavigationValue } from "./argoYamlSyntax";
-import type { DocumentPosition, TextDocumentReader } from "./argoYamlDocumentContext";
+import type { DocumentPosition } from "./argoYamlDocumentContext";
+
+// `name:` also covers `generateName:`.
+const navigationKeyPattern = /(?:name|template|entrypoint|onExit):/;
 
 export function isNavigationCandidateLine(line: string): boolean {
-  return (
-    line.includes("name:") ||
-    line.includes("template:") ||
-    line.includes("entrypoint:") ||
-    line.includes("onExit:") ||
+  return navigationKeyPattern.test(line) ||
     line.includes("depends:") ||
     line.includes("dependencies:") ||
-    /^\s*-\s*[A-Za-z0-9_-]+/.test(line)
-  );
+    /^\s*-\s*[A-Za-z0-9_-]+/.test(line);
 }
 
 export function getNavigationValueAtPosition(
-  document: TextDocumentReader,
+  lines: string[],
   position: DocumentPosition
 ): string | undefined {
-  const line = document.getLine(position.line);
+  const line = lines[position.line];
   return getWordAtPosition(line, position.character) ??
-    (hasNavigationValue(line) ? extractNavigationValue(line) : undefined);
-}
-
-function hasNavigationValue(line: string): boolean {
-  return (
-    line.includes("name:") ||
-    line.includes("template:") ||
-    line.includes("entrypoint:") ||
-    line.includes("onExit:") ||
-    line.includes("generateName:")
-  );
+    (navigationKeyPattern.test(line) ? extractNavigationValue(line) : undefined);
 }
 
 function getWordAtPosition(line: string, character: number): string | undefined {

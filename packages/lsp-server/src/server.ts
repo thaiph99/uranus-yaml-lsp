@@ -5,7 +5,6 @@ import {
   TextDocuments,
   ProposedFeatures,
   InitializeParams,
-  DidChangeConfigurationNotification,
   TextDocumentSyncKind,
   InitializeResult
 } from 'vscode-languageserver/node';
@@ -16,43 +15,18 @@ import { cacheOpenDocument, getDocumentFilePath, removeClosedDocument } from './
 import { DefinitionHandler, ReferencesHandler } from './handlers';
 
 const connection = createConnection(ProposedFeatures.all);
+const documents = new TextDocuments(TextDocument);
+const workspaceCacheService = new WorkspaceCacheService();
 
-const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
-
-let hasConfigurationCapability = false;
-let hasWorkspaceFolderCapability = false;
-let workspaceRoot = '';
-
-// Core services
-let fileSystemService: FileSystemService;
-let workspaceCacheService: WorkspaceCacheService;
-let templateSearchService: TemplateSearchService;
 let definitionHandler: DefinitionHandler;
 let referencesHandler: ReferencesHandler;
 
 connection.onInitialize((params: InitializeParams) => {
-  const capabilities = params.capabilities;
+  const workspaceRoot =
+    getDocumentFilePath(params.workspaceFolders?.[0]?.uri ?? params.rootUri ?? '') ??
+    params.rootPath ?? '';
 
-  hasConfigurationCapability = !!(
-    capabilities.workspace && !!capabilities.workspace.configuration
-  );
-  hasWorkspaceFolderCapability = !!(
-    capabilities.workspace && !!capabilities.workspace.workspaceFolders
-  );
-
-  // Get workspace root
-  if (params.workspaceFolders && params.workspaceFolders.length > 0) {
-    workspaceRoot = getDocumentFilePath(params.workspaceFolders[0].uri) ?? '';
-  } else if (params.rootUri) {
-    workspaceRoot = getDocumentFilePath(params.rootUri) ?? '';
-  } else if (params.rootPath) {
-    workspaceRoot = params.rootPath;
-  }
-
-  // Initialize services
-  fileSystemService = new FileSystemService();
-  workspaceCacheService = new WorkspaceCacheService();
-  templateSearchService = new TemplateSearchService(fileSystemService, workspaceCacheService);
+  const templateSearchService = new TemplateSearchService(new FileSystemService(), workspaceCacheService);
   definitionHandler = new DefinitionHandler(templateSearchService, documents, workspaceRoot);
   referencesHandler = new ReferencesHandler(templateSearchService, documents, workspaceRoot);
 
@@ -64,24 +38,13 @@ connection.onInitialize((params: InitializeParams) => {
     }
   };
 
-  if (hasWorkspaceFolderCapability) {
-    result.capabilities.workspace = {
-      workspaceFolders: {
-        supported: true
-      }
-    };
+  if (params.capabilities.workspace?.workspaceFolders) {
+    result.capabilities.workspace = { workspaceFolders: { supported: true } };
   }
 
   return result;
 });
 
-connection.onInitialized(() => {
-  if (hasConfigurationCapability) {
-    connection.client.register(DidChangeConfigurationNotification.type, undefined);
-  }
-});
-
-// Handle definition requests
 connection.onDefinition(async (params) => {
   try {
     return await definitionHandler.handleDefinition(params);
@@ -91,7 +54,6 @@ connection.onDefinition(async (params) => {
   }
 });
 
-// Handle references requests
 connection.onReferences(async (params) => {
   try {
     return await referencesHandler.handleReferences(params);
@@ -101,29 +63,10 @@ connection.onReferences(async (params) => {
   }
 });
 
-// Handle configuration changes
-connection.onDidChangeConfiguration(_change => {
-  // Placeholder for configuration handling
-});
+// Keep the workspace cache in sync with editor buffers.
+documents.onDidOpen((change) => cacheOpenDocument(workspaceCacheService, change.document));
+documents.onDidChangeContent((change) => cacheOpenDocument(workspaceCacheService, change.document));
+documents.onDidClose((change) => removeClosedDocument(workspaceCacheService, change.document));
 
-// Handle document changes
-documents.onDidOpen((change) => {
-  cacheOpenDocument(workspaceCacheService, change.document);
-});
-
-documents.onDidChangeContent((change) => {
-  cacheOpenDocument(workspaceCacheService, change.document);
-});
-
-documents.onDidClose((change) => {
-  removeClosedDocument(workspaceCacheService, change.document);
-});
-
-// Make the text document manager listen on the connection
-// for open, change and close text document events
 documents.listen(connection);
-
-// Listen on the connection
 connection.listen();
-
-export { connection, documents };

@@ -5,13 +5,12 @@ import {
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
-  ArgoYamlNavigationTarget,
   ArgoYamlNavigationService,
   searchTargetReferences,
   TemplateSearchService
 } from '@uranus-yaml/core';
 import { getDocumentFilePath } from '../documentCacheSync';
-import { LspDocumentReader, toLspLocations } from './lspNavigationAdapter';
+import { toLspLocations } from './lspNavigationAdapter';
 
 export class ReferencesHandler {
   constructor(
@@ -28,30 +27,21 @@ export class ReferencesHandler {
     }
 
     const target = this.navigationService.getNavigationTarget(
-      new LspDocumentReader(document),
+      document.getText().split('\n'),
       params.position
     );
-
     if (!target) {
       return [];
     }
 
-    return this.findReferences(target, getDocumentFilePath(document.uri));
-  }
-
-  private async findReferences(
-    target: ArgoYamlNavigationTarget,
-    sourceFilePath?: string
-  ): Promise<Location[]> {
     try {
-      const searchResult = await searchTargetReferences(
+      const result = await searchTargetReferences(
         this.templateSearchService,
         this.workspaceRoot,
         target,
-        sourceFilePath
+        getDocumentFilePath(document.uri)
       );
-
-      return toLspLocations(searchResult.locations);
+      return toLspLocations(result.locations);
     } catch (error) {
       console.error('Error resolving Argo YAML references:', error);
       return [];

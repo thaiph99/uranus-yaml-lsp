@@ -5,15 +5,11 @@ import {
   getIndent,
   isArgoResourceLine
 } from "./argoYamlSyntax";
+import { findSequenceItemIndent } from "./argoYamlStructure";
 
 export interface DocumentPosition {
   readonly line: number;
   readonly character: number;
-}
-
-export interface TextDocumentReader {
-  readonly lineCount: number;
-  getLine(line: number): string;
 }
 
 export interface ArgoResourceContext {
@@ -23,25 +19,25 @@ export interface ArgoResourceContext {
 
 export type ReusableTemplateRefKey = "templateRef" | "workflowTemplateRef";
 
-export function findContainingDagTasksSection(
-  document: TextDocumentReader,
-  position: DocumentPosition
-): number {
-  const positionIndent = getIndent(document.getLine(position.line));
+export function findContainingDagTasksSection(lines: string[], position: DocumentPosition): number {
+  const positionLine = lines[position.line];
+  const positionIndent = getIndent(positionLine);
 
   for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
-    const line = document.getLine(lineIndex);
+    const line = lines[lineIndex];
     if (!/^\s*tasks:\s*(?:#.*)?$/.test(line)) {
       continue;
     }
 
     const tasksIndent = getIndent(line);
-    if (position.line !== lineIndex && positionIndent <= tasksIndent) {
+    if (position.line !== lineIndex &&
+        (positionIndent < tasksIndent ||
+          (positionIndent === tasksIndent && !positionLine.trim().startsWith("- ")))) {
       continue;
     }
 
-    if (!hasSectionBoundaryBetween(document, lineIndex, position.line, tasksIndent) &&
-        isDagTasksSection(document, lineIndex)) {
+    if (!hasSectionBoundaryBetween(lines, lineIndex, position.line, tasksIndent, true) &&
+        isDagTasksSection(lines, lineIndex)) {
       return lineIndex;
     }
   }
@@ -50,17 +46,17 @@ export function findContainingDagTasksSection(
 }
 
 export function getContainingTemplateName(
-  document: TextDocumentReader,
+  lines: string[],
   position: DocumentPosition
 ): string | undefined {
   for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
-    const line = document.getLine(lineIndex);
+    const line = lines[lineIndex];
     if (lineIndex < position.line && isArgoResourceLine(line)) {
       return undefined;
     }
 
     if (/^\s*-\s+name:\s*(.+)$/.test(line) &&
-        isDirectTemplateDefinition(document, lineIndex)) {
+        isDirectTemplateDefinition(lines, lineIndex)) {
       return extractNavigationValue(line);
     }
   }
@@ -69,20 +65,20 @@ export function getContainingTemplateName(
 }
 
 export function findReferenceBlockLine(
-  document: TextDocumentReader,
+  lines: string[],
   position: DocumentPosition,
   key: ReusableTemplateRefKey
 ): number | undefined {
   const startLine = Math.max(0, position.line - 15);
-  const valueIndent = getIndent(document.getLine(position.line));
+  const valueIndent = getIndent(lines[position.line]);
   const blockPattern = new RegExp(`^\\s*${key}:\\s*(?:#.*)?$`);
 
   for (let lineIndex = position.line; lineIndex >= startLine; lineIndex--) {
-    const line = document.getLine(lineIndex);
+    const line = lines[lineIndex];
     const blockIndent = getIndent(line);
     if (blockPattern.test(line) &&
         blockIndent < valueIndent &&
-        !hasSectionBoundaryBetween(document, lineIndex, position.line, blockIndent)) {
+        !hasSectionBoundaryBetween(lines, lineIndex, position.line, blockIndent)) {
       return lineIndex;
     }
   }
@@ -91,18 +87,18 @@ export function findReferenceBlockLine(
 }
 
 export function getContainingArgoResource(
-  document: TextDocumentReader,
+  lines: string[],
   position: DocumentPosition
 ): ArgoResourceContext | undefined {
   for (let lineIndex = position.line; lineIndex >= 0; lineIndex--) {
-    const kind = getArgoResourceKind(document.getLine(lineIndex));
+    const kind = getArgoResourceKind(lines[lineIndex]);
     if (!kind) {
       continue;
     }
 
-    const endLine = Math.min(document.lineCount, lineIndex + 20);
+    const endLine = Math.min(lines.length, lineIndex + 20);
     for (let metadataLineIndex = lineIndex + 1; metadataLineIndex < endLine; metadataLineIndex++) {
-      const metadataLine = document.getLine(metadataLineIndex);
+      const metadataLine = lines[metadataLineIndex];
       if (metadataLine.includes("name:") || metadataLine.includes("generateName:")) {
         const name = extractNavigationValue(metadataLine);
         return name ? { kind, name } : undefined;
@@ -113,17 +109,17 @@ export function getContainingArgoResource(
   return undefined;
 }
 
-export function isDirectTemplateDefinition(document: TextDocumentReader, lineIndex: number): boolean {
-  const templatesLineIndex = findContainingTemplatesSection(document, lineIndex);
+export function isDirectTemplateDefinition(lines: string[], lineIndex: number): boolean {
+  const templatesLineIndex = findContainingTemplatesSection(lines, lineIndex);
   if (templatesLineIndex === -1) {
     return false;
   }
 
-  return getIndent(document.getLine(lineIndex)) === getIndent(document.getLine(templatesLineIndex)) + 2;
+  return getIndent(lines[lineIndex]) === findSequenceItemIndent(lines, templatesLineIndex, lineIndex + 1);
 }
 
 export function isInReusableTemplateMetadata(
-  document: TextDocumentReader,
+  lines: string[],
   position: DocumentPosition
 ): boolean {
   let foundReusableTemplate = false;
@@ -131,7 +127,7 @@ export function isInReusableTemplateMetadata(
   const startLine = Math.max(0, position.line - 20);
 
   for (let lineIndex = position.line; lineIndex >= startLine; lineIndex--) {
-    const line = document.getLine(lineIndex);
+    const line = lines[lineIndex];
     if (line.includes("metadata:")) {
       foundMetadata = true;
     }
@@ -148,18 +144,21 @@ export function isInReusableTemplateMetadata(
 }
 
 function hasSectionBoundaryBetween(
-  document: TextDocumentReader,
+  lines: string[],
   startLine: number,
   endLine: number,
-  sectionIndent: number
+  sectionIndent: number,
+  itemsAtSectionIndentBelong = false
 ): boolean {
   for (let lineIndex = startLine + 1; lineIndex < endLine; lineIndex++) {
-    const line = document.getLine(lineIndex);
-    if (line.trim().length === 0 || /^\s*#/.test(line)) {
+    const trimmed = lines[lineIndex].trim();
+    if (trimmed === "" || trimmed.startsWith("#")) {
       continue;
     }
 
-    if (getIndent(line) <= sectionIndent) {
+    const indent = getIndent(lines[lineIndex]);
+    if (indent < sectionIndent ||
+        (indent === sectionIndent && !(itemsAtSectionIndentBelong && trimmed.startsWith("- ")))) {
       return true;
     }
   }
@@ -167,16 +166,12 @@ function hasSectionBoundaryBetween(
   return false;
 }
 
-function isDagTasksSection(document: TextDocumentReader, tasksLineIndex: number): boolean {
-  const tasksIndent = getIndent(document.getLine(tasksLineIndex));
+function isDagTasksSection(lines: string[], tasksLineIndex: number): boolean {
+  const tasksIndent = getIndent(lines[tasksLineIndex]);
 
   for (let lineIndex = tasksLineIndex - 1; lineIndex >= 0; lineIndex--) {
-    const line = document.getLine(lineIndex);
-    if (line.trim().length === 0) {
-      continue;
-    }
-
-    if (getIndent(line) >= tasksIndent) {
+    const line = lines[lineIndex];
+    if (line.trim() === "" || getIndent(line) >= tasksIndent) {
       continue;
     }
 
@@ -186,9 +181,9 @@ function isDagTasksSection(document: TextDocumentReader, tasksLineIndex: number)
   return false;
 }
 
-function findContainingTemplatesSection(document: TextDocumentReader, lineIndex: number): number {
+function findContainingTemplatesSection(lines: string[], lineIndex: number): number {
   for (let candidateLine = lineIndex; candidateLine >= 0; candidateLine--) {
-    const line = document.getLine(candidateLine);
+    const line = lines[candidateLine];
     if (line.includes("templates:")) {
       return candidateLine;
     }

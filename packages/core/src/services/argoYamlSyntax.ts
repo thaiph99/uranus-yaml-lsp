@@ -34,3 +34,22 @@ export function extractKeyValue(line: string, key: NavigationKey): string | unde
 export function extractNavigationValue(line: string): string | undefined {
   return line.match(/(?:name|generateName|template|entrypoint|onExit):\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/)?.[1];
 }
+
+export function getKeyValueRange(
+  line: string,
+  key: NavigationKey,
+  expectedValue: string
+): { character: number; endCharacter: number } | undefined {
+  const match = line.match(new RegExp(`${key}:\\s*['"]?([^'"#\\s]+)['"]?\\s*(?:#.*)?$`));
+  if (!match || match.index === undefined || match[1] !== expectedValue) {
+    return undefined;
+  }
+
+  const characterInMatch = match[0].indexOf(expectedValue, match[0].indexOf(":") + 1);
+  if (characterInMatch === -1) {
+    return undefined;
+  }
+
+  const character = match.index + characterInMatch;
+  return { character, endCharacter: character + expectedValue.length };
+}

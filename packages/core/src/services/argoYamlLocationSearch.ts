@@ -2,6 +2,7 @@ import { WorkflowTemplateLocation } from "../types";
 import {
   extractKeyValue,
   getIndent,
+  getKeyValueRange,
   NavigationKey,
   ReusableTemplateKind
 } from "./argoYamlSyntax";
@@ -26,7 +27,7 @@ interface ValueLocation {
   readonly endCharacter: number;
 }
 
-interface ReusableTemplateReference {
+export interface ReusableTemplateReference {
   readonly name: ValueLocation | undefined;
   readonly template: ValueLocation | undefined;
   readonly clusterScope: boolean;
@@ -153,7 +154,7 @@ export function findLocalTemplateReferences(
     locations.push({
       file: filePath,
       line: lineIndex,
-      ...getKeyValueRange(lines[lineIndex], key, templateName),
+      ...getValueRange(lines[lineIndex], key, templateName),
     });
   }
 
@@ -226,7 +227,7 @@ export function findDagTaskReferences(
   return locations;
 }
 
-function parseReusableTemplateReference(lines: string[], startIndex: number): ReusableTemplateReference {
+export function parseReusableTemplateReference(lines: string[], startIndex: number): ReusableTemplateReference {
   let name: ValueLocation | undefined;
   let template: ValueLocation | undefined;
   let clusterScope = false;
@@ -243,12 +244,12 @@ function parseReusableTemplateReference(lines: string[], startIndex: number): Re
 
     const nameValue = extractKeyValue(line, "name");
     if (nameValue && !name) {
-      name = { value: nameValue, line: lineIndex, ...getKeyValueRange(line, "name", nameValue) };
+      name = { value: nameValue, line: lineIndex, ...getValueRange(line, "name", nameValue) };
     }
 
     const templateValue = extractKeyValue(line, "template");
     if (templateValue) {
-      template = { value: templateValue, line: lineIndex, ...getKeyValueRange(line, "template", templateValue) };
+      template = { value: templateValue, line: lineIndex, ...getValueRange(line, "template", templateValue) };
     }
 
     if (/^\s*clusterScope:\s*true\s*(?:#.*)?$/.test(line)) {
@@ -260,26 +261,15 @@ function parseReusableTemplateReference(lines: string[], startIndex: number): Re
 }
 
 function getNameValueRange(line: string, expectedValue: string): { character: number; endCharacter: number } {
-  return getKeyValueRange(line, "name", expectedValue);
+  return getValueRange(line, "name", expectedValue);
 }
 
-function getKeyValueRange(
+function getValueRange(
   line: string,
   key: NavigationKey,
   expectedValue: string
 ): { character: number; endCharacter: number } {
-  const match = line.match(new RegExp(`${key}:\\s*['"]?([^'"#\\s]+)['"]?\\s*(?:#.*)?$`));
-  if (!match || match.index === undefined || match[1] !== expectedValue) {
-    return { character: 0, endCharacter: line.length };
-  }
-
-  const characterInMatch = match[0].indexOf(expectedValue, match[0].indexOf(":") + 1);
-  if (characterInMatch === -1) {
-    return { character: 0, endCharacter: line.length };
-  }
-
-  const character = match.index + characterInMatch;
-  return { character, endCharacter: character + expectedValue.length };
+  return getKeyValueRange(line, key, expectedValue) ?? { character: 0, endCharacter: line.length };
 }
 
 function getLocalTemplateCallKey(

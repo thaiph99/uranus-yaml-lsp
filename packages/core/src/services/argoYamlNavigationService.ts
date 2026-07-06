@@ -1,13 +1,6 @@
-import {
-  isReusableTemplateKind
-} from "./argoYamlSyntax";
-import type {
-  DocumentPosition,
-  TextDocumentReader
-} from "./argoYamlDocumentContext";
-import {
-  isNavigationCandidateLine
-} from "./argoYamlCursorSyntax";
+import { isReusableTemplateKind } from "./argoYamlSyntax";
+import type { DocumentPosition } from "./argoYamlDocumentContext";
+import { isNavigationCandidateLine } from "./argoYamlCursorSyntax";
 import {
   getDagDependencyReferenceContext,
   getDagTaskDefinitionContext,
@@ -18,7 +11,7 @@ import {
   getWorkflowTemplateRefName
 } from "./argoYamlTargetContext";
 
-export type { DocumentPosition, TextDocumentReader } from "./argoYamlDocumentContext";
+export type { DocumentPosition } from "./argoYamlDocumentContext";
 
 export type ArgoYamlNavigationTarget =
   | {
@@ -68,35 +61,25 @@ export type ArgoYamlNavigationTarget =
 
 export class ArgoYamlNavigationService {
   public getNavigationTarget(
-    document: TextDocumentReader,
+    lines: string[],
     position: DocumentPosition
   ): ArgoYamlNavigationTarget | undefined {
-    const line = document.getLine(position.line);
-    if (!isNavigationCandidateLine(line)) {
+    const line = lines[position.line];
+    if (!line || !isNavigationCandidateLine(line)) {
       return undefined;
     }
 
-    const dagDependencyReference = getDagDependencyReferenceContext(document, position);
+    const dagDependencyReference = getDagDependencyReferenceContext(lines, position);
     if (dagDependencyReference) {
-      return {
-        kind: "dagTaskDefinition",
-        resourceName: dagDependencyReference.resourceName,
-        templateName: dagDependencyReference.templateName,
-        taskName: dagDependencyReference.taskName
-      };
+      return { kind: "dagTaskDefinition", ...dagDependencyReference };
     }
 
-    const dagTaskDefinition = getDagTaskDefinitionContext(document, position);
+    const dagTaskDefinition = getDagTaskDefinitionContext(lines, position);
     if (dagTaskDefinition) {
-      return {
-        kind: "dagTaskReferences",
-        resourceName: dagTaskDefinition.resourceName,
-        templateName: dagTaskDefinition.templateName,
-        taskName: dagTaskDefinition.taskName
-      };
+      return { kind: "dagTaskReferences", ...dagTaskDefinition };
     }
 
-    const templateDefinition = getTemplateDefinitionContext(document, position);
+    const templateDefinition = getTemplateDefinitionContext(lines, position);
     if (templateDefinition) {
       if (isReusableTemplateKind(templateDefinition.resource.kind)) {
         return {
@@ -114,35 +97,22 @@ export class ArgoYamlNavigationService {
       };
     }
 
-    const workflowTemplateDefinition = getWorkflowTemplateDefinitionName(document, position);
+    const workflowTemplateDefinition = getWorkflowTemplateDefinitionName(lines, position);
     if (workflowTemplateDefinition) {
-      return {
-        kind: "workflowTemplateReferences",
-        workflowTemplateName: workflowTemplateDefinition.workflowTemplateName,
-        ...(workflowTemplateDefinition.clusterScope ? { clusterScope: true } : {})
-      };
+      return { kind: "workflowTemplateReferences", ...workflowTemplateDefinition };
     }
 
-    const templateRefContext = getTemplateRefContext(document, position);
+    const templateRefContext = getTemplateRefContext(lines, position);
     if (templateRefContext) {
-      return {
-        kind: "templateDefinition",
-        workflowTemplateName: templateRefContext.workflowTemplateName,
-        templateName: templateRefContext.templateName,
-        ...(templateRefContext.clusterScope ? { clusterScope: true } : {})
-      };
+      return { kind: "templateDefinition", ...templateRefContext };
     }
 
-    const workflowTemplateRef = getWorkflowTemplateRefName(document, position);
+    const workflowTemplateRef = getWorkflowTemplateRefName(lines, position);
     if (workflowTemplateRef) {
-      return {
-        kind: "workflowTemplateDefinition",
-        workflowTemplateName: workflowTemplateRef.workflowTemplateName,
-        ...(workflowTemplateRef.clusterScope ? { clusterScope: true } : {})
-      };
+      return { kind: "workflowTemplateDefinition", ...workflowTemplateRef };
     }
 
-    const localTemplateCall = getLocalTemplateCallContext(document, position);
+    const localTemplateCall = getLocalTemplateCallContext(lines, position);
     if (localTemplateCall) {
       return {
         kind: "localTemplateDefinition",
@@ -153,5 +123,4 @@ export class ArgoYamlNavigationService {
 
     return undefined;
   }
-
 }

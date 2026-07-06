@@ -3,19 +3,9 @@ const { test } = require('node:test');
 
 const { ArgoYamlNavigationService } = require('../dist');
 
-class TestDocumentReader {
-  constructor(content) {
-    this.lines = content.split('\n');
-    this.lineCount = this.lines.length;
-  }
-
-  getLine(line) {
-    return this.lines[line] ?? '';
-  }
-
-  getTextInRange(startLine, endLine) {
-    return this.lines.slice(startLine, endLine).join('\n');
-  }
+// getNavigationTarget takes the document as an array of lines.
+function TestDocumentReader(content) {
+  return content.split('\n');
 }
 
 const service = new ArgoYamlNavigationService();
@@ -315,7 +305,7 @@ spec:
     - name: echo`);
 
   assert.deepStrictEqual(
-    service.getNavigationTarget(document, { line: 9, character: document.getLine(9).indexOf('A') }),
+    service.getNavigationTarget(document, { line: 9, character: document[9].indexOf('A') }),
     {
       kind: 'dagTaskReferences',
       resourceName: 'dag-workflow',
@@ -348,7 +338,7 @@ spec:
     assert.deepStrictEqual(
       service.getNavigationTarget(document, {
         line: 14,
-        character: document.getLine(14).indexOf(taskName),
+        character: document[14].indexOf(taskName),
       }),
       {
         kind: 'dagTaskDefinition',
@@ -390,7 +380,7 @@ spec:
     assert.deepStrictEqual(
       service.getNavigationTarget(document, {
         line: testCase.line,
-        character: document.getLine(testCase.line).indexOf(testCase.taskName),
+        character: document[testCase.line].indexOf(testCase.taskName),
       }),
       {
         kind: 'dagTaskDefinition',
@@ -423,7 +413,7 @@ spec:
             template: echo
     - name: echo`);
 
-  const dependsLine = document.getLine(16);
+  const dependsLine = document[16];
   const cases = [
     { character: dependsLine.indexOf('A.Succeeded'), taskName: 'A' },
     { character: dependsLine.indexOf('B.Failed'), taskName: 'B' },
@@ -460,7 +450,7 @@ spec:
             template: echo
     - name: echo`);
 
-  const dependsLine = document.getLine(12);
+  const dependsLine = document[12];
   const cases = [
     { label: 'dot', character: dependsLine.indexOf('.') },
     { label: 'Succeeded', character: dependsLine.indexOf('Succeeded') },
@@ -504,14 +494,14 @@ spec:
   assert.equal(
     service.getNavigationTarget(document, {
       line: 11,
-      character: document.getLine(11).indexOf('A'),
+      character: document[11].indexOf('A'),
     }),
     undefined
   );
   assert.equal(
     service.getNavigationTarget(document, {
       line: 12,
-      character: document.getLine(12).indexOf('A.Succeeded'),
+      character: document[12].indexOf('A.Succeeded'),
     }),
     undefined
   );
@@ -538,14 +528,14 @@ ${fillerTasks}
             depends: upstream.Succeeded
             template: echo
     - name: echo`);
-  const dependencyLine = Array.from({ length: document.lineCount }, (_, line) => line)
-    .find((line) => document.getLine(line).includes('depends: upstream'));
+  const dependencyLine = Array.from({ length: document.length }, (_, line) => line)
+    .find((line) => document[line].includes('depends: upstream'));
 
   assert.notEqual(dependencyLine, undefined);
   assert.deepStrictEqual(
     service.getNavigationTarget(document, {
       line: dependencyLine,
-      character: document.getLine(dependencyLine).indexOf('upstream'),
+      character: document[dependencyLine].indexOf('upstream'),
     }),
     {
       kind: 'dagTaskDefinition',
@@ -554,16 +544,69 @@ ${fillerTasks}
       taskName: 'upstream',
     }
   );
-  const echoDefinitionLine = document.lineCount - 1;
+  const echoDefinitionLine = document.length - 1;
   assert.deepStrictEqual(
     service.getNavigationTarget(document, {
       line: echoDefinitionLine,
-      character: document.getLine(echoDefinitionLine).indexOf('echo'),
+      character: document[echoDefinitionLine].indexOf('echo'),
     }),
     {
       kind: 'localTemplateReferences',
       resourceName: 'large-dag-workflow',
       templateName: 'echo',
+    }
+  );
+});
+
+test('resolves navigation when list items align with their parent key', () => {
+  const document = new TestDocumentReader(`apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: same-indent
+spec:
+  entrypoint: main
+  templates:
+  - name: main
+    dag:
+      tasks:
+      - name: task-a
+        template: helper
+      - name: task-b
+        dependencies: [task-a]
+  - name: helper`);
+
+  assert.deepStrictEqual(
+    service.getNavigationTarget(document, { line: 14, character: 10 }),
+    {
+      kind: 'templateReferences',
+      workflowTemplateName: 'same-indent',
+      templateName: 'helper',
+    }
+  );
+  assert.deepStrictEqual(
+    service.getNavigationTarget(document, { line: 10, character: 14 }),
+    {
+      kind: 'dagTaskReferences',
+      resourceName: 'same-indent',
+      templateName: 'main',
+      taskName: 'task-a',
+    }
+  );
+  assert.deepStrictEqual(
+    service.getNavigationTarget(document, { line: 13, character: document[13].indexOf('task-a') }),
+    {
+      kind: 'dagTaskDefinition',
+      resourceName: 'same-indent',
+      templateName: 'main',
+      taskName: 'task-a',
+    }
+  );
+  assert.deepStrictEqual(
+    service.getNavigationTarget(document, { line: 11, character: 18 }),
+    {
+      kind: 'localTemplateDefinition',
+      resourceName: 'same-indent',
+      templateName: 'helper',
     }
   );
 });
