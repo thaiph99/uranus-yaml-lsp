@@ -2,69 +2,44 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export class FileSystemService {
-  private readonly yamlExtensions = ['.yaml', '.yml'];
-  private readonly maxConcurrency = 20;
+  private readonly maxDepth = 10;
   private readonly ignoredDirs = new Set([
     'node_modules', '.git', '.vscode', 'dist', 'build', 'out', 'target'
   ]);
 
   public async findYamlFiles(rootPath: string): Promise<string[]> {
-    const allFiles = new Set<string>();
-    await this.walkDirectoryParallel(rootPath, allFiles);
-    return Array.from(allFiles);
+    const files: string[] = [];
+    await this.walkDirectory(rootPath, files, 0);
+    return files;
   }
 
-  public async readFileContent(filePath: string): Promise<string> {
+  public readFileContent(filePath: string): Promise<string> {
     return fs.promises.readFile(filePath, 'utf8');
   }
 
-  private async walkDirectoryParallel(
-    dir: string,
-    fileList: Set<string>,
-    depth: number = 0
-  ): Promise<void> {
-    if (depth > 10) return;
+  private async walkDirectory(dir: string, files: string[], depth: number): Promise<void> {
+    if (depth > this.maxDepth) {
+      return;
+    }
 
+    let entries;
     try {
-      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-
-      const dirPromises: Promise<void>[] = [];
-
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-
-        if (entry.isFile() && this.isYamlFile(entry.name)) {
-          fileList.add(fullPath);
-        } else if (entry.isDirectory() && !this.shouldIgnoreDirectory(entry.name)) {
-          dirPromises.push(this.walkDirectoryParallel(fullPath, fileList, depth + 1));
-        }
-      }
-
-      await this.processInBatches(dirPromises, this.maxConcurrency);
-
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
     } catch {
-      // Silently skip inaccessible directories
+      return; // Silently skip inaccessible directories
     }
-  }
 
-  private async processInBatches<T>(
-    promises: Promise<T>[],
-    batchSize: number
-  ): Promise<T[]> {
-    const results: T[] = [];
-
-    for (let i = 0; i < promises.length; i += batchSize) {
-      const batch = promises.slice(i, i + batchSize);
-      const batchResults = await Promise.allSettled(batch);
-
-      for (const result of batchResults) {
-        if (result.status === 'fulfilled') {
-          results.push(result.value);
-        }
+    const subdirectories: Promise<void>[] = [];
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isFile() && this.isYamlFile(entry.name)) {
+        files.push(fullPath);
+      } else if (entry.isDirectory() && !this.shouldIgnoreDirectory(entry.name)) {
+        subdirectories.push(this.walkDirectory(fullPath, files, depth + 1));
       }
     }
 
-    return results;
+    await Promise.all(subdirectories);
   }
 
   private shouldIgnoreDirectory(dirName: string): boolean {
@@ -72,6 +47,6 @@ export class FileSystemService {
   }
 
   private isYamlFile(fileName: string): boolean {
-    return this.yamlExtensions.some(ext => fileName.endsWith(ext));
+    return fileName.endsWith('.yaml') || fileName.endsWith('.yml');
   }
 }

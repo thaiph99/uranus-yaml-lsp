@@ -22,30 +22,23 @@ export class TemplateSearchService {
     private readonly workspaceCacheService = new WorkspaceCacheService()
   ) {}
 
-  public async findTemplateDefinition(
+  public findTemplateDefinition(
     rootPath: string,
     templateName: string,
     clusterScope = false
   ): Promise<TemplateSearchResult> {
-    const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+    return this.search(rootPath, templateName, (content, filePath) =>
       findReusableTemplateDefinitions(content, filePath, templateName, clusterScope)
     );
-
-    return {
-      templateName,
-      locations,
-    };
   }
 
-  public async findTemplateInWorkflowTemplate(
+  public findTemplateInWorkflowTemplate(
     rootPath: string,
     workflowTemplateName: string,
     templateName: string,
     clusterScope = false
   ): Promise<TemplateSearchResult> {
-    const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+    return this.search(rootPath, templateName, (content, filePath) =>
       findTemplateDefinitionInResource(
         content,
         filePath,
@@ -54,59 +47,39 @@ export class TemplateSearchService {
         getReusableTemplateKind(clusterScope)
       )
     );
-
-    return {
-      templateName,
-      locations,
-    };
   }
 
-  public async findTemplateInArgoResource(
+  public findTemplateInArgoResource(
     rootPath: string,
     resourceName: string,
     templateName: string
   ): Promise<TemplateSearchResult> {
-    const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+    return this.search(rootPath, templateName, (content, filePath) =>
       findTemplateDefinitionInResource(content, filePath, resourceName, templateName)
     );
-
-    return {
-      templateName,
-      locations,
-    };
   }
 
-  public async findTemplateReferences(
+  public findTemplateReferences(
     rootPath: string,
     workflowTemplateName: string,
     templateName: string,
     clusterScope = false
   ): Promise<TemplateSearchResult> {
-    const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+    return this.search(rootPath, templateName, (content, filePath) =>
       findReusableTemplateReferences(
         content,
         filePath,
         workflowTemplateName,
         templateName,
         clusterScope
-      )
-    );
-    const localLocations = await this.searchFiles(yamlFiles, (content, filePath) =>
-      findLocalTemplateReferences(
+      ).concat(findLocalTemplateReferences(
         content,
         filePath,
         workflowTemplateName,
         templateName,
         getReusableTemplateKind(clusterScope)
-      )
+      ))
     );
-
-    return {
-      templateName,
-      locations: locations.concat(localLocations),
-    };
   }
 
   public async findLocalTemplateReferences(
@@ -122,60 +95,48 @@ export class TemplateSearchService {
       findLocalTemplateReferences(content, filePath, resourceName, templateName)
     );
 
-    return {
-      templateName,
-      locations,
-    };
+    return { templateName, locations };
   }
 
-  public async findDagTaskDefinition(
+  public findDagTaskDefinition(
     rootPath: string,
     resourceName: string,
     templateName: string,
     taskName: string
   ): Promise<TemplateSearchResult> {
-    const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+    return this.search(rootPath, taskName, (content, filePath) =>
       findDagTaskDefinition(content, filePath, resourceName, templateName, taskName)
     );
-
-    return {
-      templateName: taskName,
-      locations,
-    };
   }
 
-  public async findDagTaskReferences(
+  public findDagTaskReferences(
     rootPath: string,
     resourceName: string,
     templateName: string,
     taskName: string
   ): Promise<TemplateSearchResult> {
-    const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+    return this.search(rootPath, taskName, (content, filePath) =>
       findDagTaskReferences(content, filePath, resourceName, templateName, taskName)
     );
-
-    return {
-      templateName: taskName,
-      locations,
-    };
   }
 
-  public async findWorkflowTemplateReferences(
+  public findWorkflowTemplateReferences(
     rootPath: string,
     workflowTemplateName: string,
     clusterScope = false
   ): Promise<TemplateSearchResult> {
-    const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
-    const locations = await this.searchFiles(yamlFiles, (content, filePath) =>
+    return this.search(rootPath, workflowTemplateName, (content, filePath) =>
       findReusableTemplateResourceReferences(content, filePath, workflowTemplateName, clusterScope)
     );
+  }
 
-    return {
-      templateName: workflowTemplateName,
-      locations,
-    };
+  private async search(
+    rootPath: string,
+    templateName: string,
+    search: ContentSearch
+  ): Promise<TemplateSearchResult> {
+    const yamlFiles = await this.fileSystemService.findYamlFiles(rootPath);
+    return { templateName, locations: await this.searchFiles(yamlFiles, search) };
   }
 
   private async searchFiles(files: string[], search: ContentSearch): Promise<WorkflowTemplateLocation[]> {

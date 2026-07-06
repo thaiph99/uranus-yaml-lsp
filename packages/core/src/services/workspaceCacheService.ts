@@ -41,14 +41,10 @@ export class WorkspaceCacheService {
 
   private cleanup(): void {
     const now = Date.now();
-    const keysToDelete: string[] = [];
-
-    for (const [key, value] of this.cache.entries()) {
-      if (now - value.timestamp > this.cacheTimeout) {
-        keysToDelete.push(key);
+    for (const [key, entry] of this.cache) {
+      if (now - entry.timestamp > this.cacheTimeout) {
+        this.cache.delete(key);
       }
     }
-
-    keysToDelete.forEach((key) => this.cache.delete(key));
   }
 }
