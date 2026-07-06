@@ -36,6 +36,56 @@ test('findTemplateInWorkflowTemplate locates step1 inside tem-tem1', async () =>
   ]);
 });
 
+test('findTemplateInWorkflowTemplate locates a template defined after an embedded manifest', async () => {
+  const result = await service.findTemplateInWorkflowTemplate(
+    fixturesRoot,
+    'embedded-manifest-template',
+    'after-manifest'
+  );
+
+  assert.deepStrictEqual(summarizeLocations(result), [
+    { file: 'embedded-manifest.yaml', line: 15, character: 12, endCharacter: 26 },
+  ]);
+});
+
+test('findTemplateInWorkflowTemplate locates templates when list items align with the templates key', async () => {
+  const result = await service.findTemplateInWorkflowTemplate(
+    fixturesRoot,
+    'same-indent-template',
+    'local-step'
+  );
+
+  assert.deepStrictEqual(summarizeLocations(result), [
+    { file: 'same-indent-templates.yaml', line: 18, character: 10, endCharacter: 20 },
+  ]);
+});
+
+test('findDagTaskDefinition locates tasks when list items align with the tasks key', async () => {
+  const result = await service.findDagTaskDefinition(
+    fixturesRoot,
+    'same-indent-template',
+    'same-indent-main',
+    'second-task'
+  );
+
+  assert.deepStrictEqual(summarizeLocations(result), [
+    { file: 'same-indent-templates.yaml', line: 15, character: 14, endCharacter: 25 },
+  ]);
+});
+
+test('findDagTaskReferences locates dependencies when list items align with the tasks key', async () => {
+  const result = await service.findDagTaskReferences(
+    fixturesRoot,
+    'same-indent-template',
+    'same-indent-main',
+    'first-task'
+  );
+
+  assert.deepStrictEqual(summarizeLocations(result), [
+    { file: 'same-indent-templates.yaml', line: 16, character: 23, endCharacter: 33 },
+  ]);
+});
+
 test('findWorkflowTemplateReferences includes workflow reference fixture', async () => {
   const result = await service.findWorkflowTemplateReferences(
     fixturesRoot,

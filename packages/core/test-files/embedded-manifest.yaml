@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: embedded-manifest-template
+spec:
+  templates:
+    - name: get-model-artifacts
+      resource:
+        action: get
+        manifest: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          metadata:
+            name: nested-workflow
+    - name: after-manifest
+      script:
+        image: python:alpine3.6
+        command: [python]
+        source: |
+          print("hello")

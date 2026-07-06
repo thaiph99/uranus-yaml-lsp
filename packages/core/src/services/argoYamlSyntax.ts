@@ -8,8 +8,10 @@ export function getIndent(line: string): number {
   return line.match(/^\s*/)?.[0].length ?? 0;
 }
 
+// Only top-level `kind:` lines start a resource; indented ones belong to
+// embedded manifests (e.g. `manifest: |` block scalars).
 export function getArgoResourceKind(line: string): ArgoResourceKind | undefined {
-  return line.trim().match(argoResourceKindPattern)?.[1] as ArgoResourceKind | undefined;
+  return line.match(argoResourceKindPattern)?.[1] as ArgoResourceKind | undefined;
 }
 
 export function isArgoResourceLine(line: string): boolean {

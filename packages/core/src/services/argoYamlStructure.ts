@@ -59,7 +59,12 @@ export function findArgoResourceByName(
 
 export function findResourceEnd(lines: string[], startIndex: number): number {
   for (let i = startIndex + 1; i < lines.length; i++) {
-    const line = lines[i].trim();
+    // Only top-level lines end a resource; indented `kind:` / `apiVersion:`
+    // lines belong to embedded manifests (e.g. `manifest: |` block scalars).
+    const line = lines[i];
+    if (getIndent(line) !== 0) {
+      continue;
+    }
     if (line.startsWith("kind:") || (line.startsWith("apiVersion:") && lines[i - 1]?.trim() === "---")) {
       return i;
     }
@@ -70,8 +75,7 @@ export function findResourceEnd(lines: string[], startIndex: number): number {
 
 export function findTemplatesSection(lines: string[], startIndex: number, endIndex: number): number {
   for (let i = startIndex; i < endIndex; i++) {
-    const line = lines[i].trim();
-    if (line === "templates:" || line.startsWith("templates:")) {
+    if (lines[i].trim().startsWith("templates:")) {
       return i;
     }
   }
@@ -85,7 +89,10 @@ export function findTemplateInTemplatesSection(
   templatesEnd: number,
   templateName: string
 ): number {
-  const templateDefinitionIndent = getIndent(lines[templatesStart]) + 2;
+  const templateDefinitionIndent = findSequenceItemIndent(lines, templatesStart, templatesEnd);
+  if (templateDefinitionIndent === -1) {
+    return -1;
+  }
 
   for (let i = templatesStart + 1; i < templatesEnd; i++) {
     const line = lines[i];
@@ -133,11 +140,31 @@ export function findScopedDagTasksSection(
     return undefined;
   }
 
-  return {
-    tasksStart,
-    tasksEnd: findIndentedBlockEnd(lines, tasksStart, templateEnd),
-    taskIndent: getIndent(lines[tasksStart]) + 2,
-  };
+  const tasksEnd = findIndentedBlockEnd(lines, tasksStart, templateEnd);
+  const taskIndent = findSequenceItemIndent(lines, tasksStart, tasksEnd);
+  if (taskIndent === -1) {
+    return undefined;
+  }
+
+  return { tasksStart, tasksEnd, taskIndent };
+}
+
+// YAML sequence items may sit at their parent key's indent or deeper, so the
+// item indent must be read from the first item instead of assumed to be +2.
+export function findSequenceItemIndent(lines: string[], keyLineIndex: number, endIndex: number): number {
+  const keyIndent = getIndent(lines[keyLineIndex]);
+
+  for (let i = keyLineIndex + 1; i < endIndex; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed === "" || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const indent = getIndent(lines[i]);
+    return indent >= keyIndent && trimmed.startsWith("- ") ? indent : -1;
+  }
+
+  return -1;
 }
 
 function findResourceNameLine(lines: string[], startIndex: number, resourceName: string): number {
@@ -209,12 +236,14 @@ function findIndentedBlockEnd(lines: string[], blockStart: number, maxEnd: numbe
   const blockIndent = getIndent(lines[blockStart]);
 
   for (let i = blockStart + 1; i < maxEnd; i++) {
-    const line = lines[i];
-    if (line.trim() === "") {
+    const trimmed = lines[i].trim();
+    if (trimmed === "") {
       continue;
     }
 
-    if (getIndent(line) <= blockIndent) {
+    const indent = getIndent(lines[i]);
+    // Sequence items at the block key's own indent still belong to the block.
+    if (indent < blockIndent || (indent === blockIndent && !trimmed.startsWith("- "))) {
       return i;
     }
   }
